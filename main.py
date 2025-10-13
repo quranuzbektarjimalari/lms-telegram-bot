@@ -1,0 +1,238 @@
+
+import nest_asyncio, asyncio, requests
+from bs4 import BeautifulSoup
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+nest_asyncio.apply()
+
+BOT_TOKEN = "8469849269:AAE3sJkk8-a-LFeWSQARdWki1-3-oVk1DPE"
+user_data = {}
+
+# === 1. LMS tizimiga kirish ===
+def login_to_lms(username, password):
+    session = requests.Session()
+    login_url = "https://lms.iiau.uz/auth/login"
+
+    response = session.get(login_url)
+    if response.status_code != 200:
+        return None, "❌ LMS sahifasiga ulanib bo‘lmadi."
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    token_tag = soup.find("input", {"name": "_token"})
+    token = token_tag["value"] if token_tag else ""
+
+    payload = {
+        "_token": token,
+        "login": username,
+        "password": password,
+        "g-recaptcha-response": ""
+    }
+
+    login_response = session.post(login_url, data=payload)
+    if "logout" in login_response.text or "Chiqish" in login_response.text:
+        # foydalanuvchi ismini olishga urinish
+        fullname = "Noma’lum foydalanuvchi"
+        try:
+            dashboard = session.get("https://lms.iiau.uz/dashboard", timeout=10)
+            prof_soup = BeautifulSoup(dashboard.text, "html.parser")
+            span_tag = prof_soup.select_one("button#dropLogin span")
+            if span_tag and span_tag.get_text(strip=True):
+                fullname = span_tag.get_text(strip=True)
+        except:
+            pass
+
+        return session, fullname, None
+    else:
+        return None, None, "❌ Login yoki parol noto‘g‘ri bo‘lishi mumkin."
+
+
+# === ⚡ Tezkor HEAD tekshiruvi ===
+def fast_check_exists(session, url):
+    """Sahifa mavjudligini HEAD orqali tezda tekshiradi"""
+    try:
+        head = session.head(url, timeout=3)
+        return head.status_code == 200
+    except:
+        return False
+
+
+# === 2. Qilinmagan testlarni topish (HEAD bilan tezlashtirilgan) ===
+def check_test(session, url):
+    try:
+        # 404 bo‘lsa darrov tashlab ketamiz
+        if not fast_check_exists(session, url):
+            return None
+
+        response = session.get(url, timeout=5)
+        if response.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        text = soup.get_text(" ", strip=True)
+
+        if "Testni boshlash" in text and "Natijani korish" not in text:
+            title_tag = soup.find("h3", class_="page-title")
+            title = title_tag.get_text(strip=True) if title_tag else "Noma’lum test"
+
+            strong_tag = soup.find("strong", string=lambda s: s and "Tugallanish vaqti" in s)
+            deadline = "-"
+            if strong_tag:
+                span_tag = strong_tag.find_next("span", class_="text-primary")
+                if span_tag:
+                    deadline = span_tag.get_text(strip=True)
+
+            return (title, deadline, url)
+    except Exception:
+        return None
+
+
+def find_unfinished_tests(session, start_id=1004, end_id=1304):
+    base_url = "https://lms.iiau.uz/student/my-course/calendar/resource/test/"
+    unfinished = []
+    urls = [f"{base_url}{i}" for i in range(start_id, end_id + 1)]
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(check_test, session, url) for url in urls]
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                unfinished.append(result)
+
+    return unfinished
+
+
+# === 3. Qilinmagan topshiriqlarni topish (HEAD bilan tezlashtirilgan) ===
+def check_assignment(session, url, resend_variants):
+    try:
+        # Avval HEAD orqali mavjudligini tekshiramiz
+        if not fast_check_exists(session, url):
+            return None
+
+        response = session.get(url, timeout=5)
+        if response.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        text = soup.get_text(" ", strip=True)
+
+        if any(t in text for t in ["Jo’natish", "Jo'natish", "Joʻnatish", "Jo`natish"]):
+            if any(r in text for r in resend_variants):
+                return None
+
+            # --- Topshiriq nomi ---
+            title = None
+            for p in soup.find_all("p", class_="header-title"):
+                if p.find("span") and "Topshiriq nomi" in p.find("span").get_text(strip=True):
+                    title = p.get_text(" ", strip=True).replace("Topshiriq nomi:", "").strip()
+                    break
+            if not title:
+                title = "Noma’lum topshiriq"
+
+            # --- Tugash muddati ---
+            deadline = "-"
+            for p in soup.find_all("p", class_="header-title"):
+                if p.find("span") and "Topshiriq muddati" in p.find("span").get_text(strip=True):
+                    deadline = p.get_text(" ", strip=True).replace("Topshiriq muddati", "").strip()
+                    break
+
+            return (title, deadline, url)
+
+    except Exception:
+        return None
+
+
+def find_unfinished_assignments(session, start_id=6343, end_id=6643):
+    base_url = "https://lms.iiau.uz/student/my-course/calendar/resource/activity/standard-"
+    resend_variants = ["Qayta jo'natish", "Qayta jo’natish", "Qayta joʻnatish", "Qayta jo`natish"]
+    unfinished = []
+    urls = [f"{base_url}{i}" for i in range(start_id, end_id + 1)]
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(check_assignment, session, url, resend_variants) for url in urls]
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                unfinished.append(result)
+
+    return unfinished
+
+
+# === 4. /start komandasi ===
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data[update.effective_chat.id] = {"stage": "login"}
+    await update.message.reply_text(
+        "👋 Assalomu alaykum! IIAU LMS botiga xush kelibsiz. Botdan foydalanish uchun ro‘yxatdan o‘tish kerak. \n\nIltimos, LMS dagi loginingizni kiriting:"
+    )
+
+
+# === 5. Xabarlarni qayta ishlash ===
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    text = update.message.text.strip()
+
+    if chat_id not in user_data:
+        await update.message.reply_text("Boshlash uchun /start deb yozing va ro‘yxatdan o‘ting.")
+        return
+
+    stage = user_data[chat_id]["stage"]
+
+    # 1. Login bosqichi
+    if stage == "login":
+        user_data[chat_id]["login"] = text
+        user_data[chat_id]["stage"] = "password"
+        await update.message.reply_text("🔑 Endi parolingizni kiriting:")
+
+    # 2. Parol bosqichi
+    elif stage == "password":
+        login = user_data[chat_id]["login"]
+        password = text
+        await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, 1 daqiqa kuting...")
+
+        session, fullname, error = login_to_lms(login, password)
+        if error:
+            await update.message.reply_text(error)
+            user_data.pop(chat_id, None)
+            return
+
+        tests = find_unfinished_tests(session)
+        assignments = find_unfinished_assignments(session)
+
+        # ✅ Foydalanuvchi holatini "done" deb o'zgartiramiz (shu joyda bo‘lishi kerak!)
+        user_data[chat_id]["stage"] = "done"
+
+        if not tests and not assignments:
+            await update.message.reply_text(f"🎉 {fullname}, sizda barcha testlar va topshiriqlar bajarilgan! 👏")
+        else:
+            msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
+
+            if tests:
+                msg += "❗ *QILINMAGAN TESTLAR 👇*\n\n"
+                for title, deadline, link in tests:
+                    msg += f"📘 *{title}*\n🕒 Tugash vaqti: {deadline}\n👉 [Testni ko‘rish]({link})\n\n"
+
+            if assignments:
+                msg += "❗ *QILINMAGAN TOPSHIRIQLAR 👇*\n\n"
+                for title, deadline, link in assignments:
+                    msg += f"📘 *{title}*\n🕒 Tugash vaqti: {deadline}\n👉 [Topshiriqni ko‘rish]({link})\n\n"
+
+            await update.message.reply_markdown(msg)
+
+    # 3. Tugallangan bosqich
+    elif stage == "done":
+        await update.message.reply_text(
+            "🔐 Siz avval LMS tekshiruvini yakunlagansiz.\n"
+            "Agar yana tekshirishni xohlasangiz, /start deb yozing va qayta login qiling."
+        )
+
+# === 6. Botni ishga tushirish ===
+async def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("🤖 Bot ishga tushdi! Endi Telegramda /start deb yozing.")
+    await app.run_polling()
+
+asyncio.run(main())
