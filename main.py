@@ -208,12 +208,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
 
             if tests:
-                msg += "❗ *QILINMAGAN TESTLAR 👇*\n\n"
+                msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
                 for title, deadline, link in tests:
                     msg += f"📘 *{title}*\n🕒 Tugash vaqti: {deadline}\n👉 [Testni ko‘rish]({link})\n\n"
 
             if assignments:
-                msg += "❗ *QILINMAGAN TOPSHIRIQLAR 👇*\n\n"
+                msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
                 for title, deadline, link in assignments:
                     msg += f"📘 *{title}*\n🕒 Tugash vaqti: {deadline}\n👉 [Topshiriqni ko‘rish]({link})\n\n"
 
@@ -236,3 +236,4 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
