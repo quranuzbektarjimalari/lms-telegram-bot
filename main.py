@@ -203,7 +203,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data[chat_id]["stage"] = "done"
 
         if not tests and not assignments:
-            await update.message.reply_text(f"👤 {fullname}, sizda bajarilmagan testlar va bajarilmagan topshiriqlar topilmadi! 👏")
+            await update.message.reply_text(f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n ✅ BAJARILMAGAN TESTLAR VA BAJARILMAGAN TOPSHIRIQLAR TOPILMADI!!!")
         else:
             msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
 
@@ -236,5 +236,6 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
 
 
