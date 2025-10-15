@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 nest_asyncio.apply()
 
-BOT_TOKEN = "8469849269:AAE3sJkk8-a-LFeWSQARdWki1-3-oVk1DPE"
+BOT_TOKEN = "8086716853:AAGKqiJE3q08xdq5gNBzJ2vbDuxIUpilKtg"
 user_data = {}
 
 # === 1. LMS tizimiga kirish ===
@@ -165,7 +165,60 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Assalomu alaykum! IIAU LMS botiga xush kelibsiz. Botdan foydalanish uchun ro‘yxatdan o‘tish kerak. \n\nIltimos, LMS dagi loginingizni kiriting:"
     )
+from datetime import datetime, timedelta
+import pytz
 
+# Tashkent vaqt zonasi
+TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
+
+def find_closest_deadline(items):
+    """
+    items: [(title, deadline_str, link), ...]
+    """
+    now = datetime.now(TASHKENT_TZ)
+    closest_dt = None
+    closest_diff = None
+
+    for title, deadline_str, link in items:
+        try:
+            # deadline stringni Tashkent vaqti bilan o‘qish
+            dt = datetime.strptime(deadline_str.strip(), "%d-%m-%Y %H:%M:%S")
+            dt = TASHKENT_TZ.localize(dt)
+        except Exception:
+            continue  # format xato bo‘lsa tashlab o‘tamiz
+
+        diff = dt - now
+        if diff.total_seconds() <= 0:
+            continue  # muddati tugagan topshiriqlarni tashlaymiz
+
+        if closest_diff is None or diff < closest_diff:
+            closest_diff = diff
+            closest_dt = dt
+
+    return closest_dt, closest_diff
+
+
+def format_timedelta(td: timedelta):
+    """
+    timedelta -> "X kun Y soat, Z minut" formatida chiqaradi
+    """
+    if not td or td.total_seconds() <= 0:
+        return ""
+
+    total_seconds = int(td.total_seconds())
+    days, rem = divmod(total_seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, _ = divmod(rem, 60)
+
+    parts = []
+    if days > 0:
+        parts.append(f"{days} kun")
+    if hours > 0:
+        parts.append(f"{hours} soat")
+    if minutes > 0:
+        parts.append(f"{minutes} minut")
+
+    return ", ".join(parts)
 
 # === 5. Xabarlarni qayta ishlash ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -199,13 +252,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tests = find_unfinished_tests(session)
         assignments = find_unfinished_assignments(session)
 
-        # ✅ Foydalanuvchi holatini "done" deb o'zgartiramiz (shu joyda bo‘lishi kerak!)
         user_data[chat_id]["stage"] = "done"
 
         if not tests and not assignments:
-            await update.message.reply_text(f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*", parse_mode="Markdown")
+            await update.message.reply_text(
+                f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
+                parse_mode="Markdown",
+            )
         else:
             msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
+
+            # 🕓 Eng yaqin deadline
+            all_items = tests + assignments
+            closest_deadline, closest_diff = find_closest_deadline(all_items)
+            if closest_deadline:
+                remaining = format_timedelta(closest_diff)
+                msg += f"_(Sizdagi eng yaqin deadline tugashiga {remaining} qoldi)_\n\n"
 
             if tests:
                 msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
@@ -225,7 +287,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔐 Siz avval LMS tekshiruvini yakunlagansiz.\n"
             "Agar yana tekshirishni xohlasangiz, /start deb yozing va qayta login qiling."
         )
-
 # === 6. Botni ishga tushirish ===
 async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -236,8 +297,3 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
-
-
-
-
-
