@@ -1,4 +1,3 @@
-
 import nest_asyncio, asyncio, requests
 from bs4 import BeautifulSoup
 from telegram import Update
@@ -267,7 +266,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             closest_deadline, closest_diff = find_closest_deadline(all_items)
             if closest_deadline:
                 remaining = format_timedelta(closest_diff)
-                msg += f"_(Sizdagi eng yaqin deadline tugashiga {remaining} qoldi)_\n\n"
+                msg += f"_(Sizdagi eng yaqin vazifa tugashiga {remaining} qoldi)_\n\n"
 
             if tests:
                 msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
@@ -297,3 +296,4 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
