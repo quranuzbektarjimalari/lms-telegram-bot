@@ -105,10 +105,11 @@ def find_unfinished_tests(session, start_id=1004, end_id=1304):
 # === 3. Qilinmagan topshiriqlarni topish (HEAD bilan tezlashtirilgan) ===
 def check_assignment(session, url, resend_variants):
     try:
-        # Avval HEAD orqali mavjudligini tekshiramiz
+        # 1️⃣ Avval HEAD orqali mavjudligini tekshiramiz
         if not fast_check_exists(session, url):
             return None
 
+        # 2️⃣ Sahifani yuklaymiz
         response = session.get(url, timeout=5)
         if response.status_code != 200:
             return None
@@ -116,27 +117,39 @@ def check_assignment(session, url, resend_variants):
         soup = BeautifulSoup(response.text, "html.parser")
         text = soup.get_text(" ", strip=True)
 
-        if any(t in text for t in ["Jo’natish", "Jo'natish", "Joʻnatish", "Jo`natish"]):
-            if any(r in text for r in resend_variants):
-                return None
+        # --- 3️⃣ “Jo‘natish”/“Fayl:”/“Qayta jo‘natish” shartlarini tekshiramiz ---
+        has_jonatish = any(t in text for t in ["Jo’natish", "Jo'natish", "Joʻnatish", "Jo`natish"])
+        has_fayl = "Fayl:" in text
+        has_qayta = any(r in text for r in resend_variants)
 
-            # --- Topshiriq nomi ---
-            title = None
-            for p in soup.find_all("p", class_="header-title"):
-                if p.find("span") and "Topshiriq nomi" in p.find("span").get_text(strip=True):
-                    title = p.get_text(" ", strip=True).replace("Topshiriq nomi:", "").strip()
-                    break
-            if not title:
-                title = "Noma’lum topshiriq"
+        # 💡 4️⃣ To‘rtta shart bo‘yicha tahlil:
+        # - “Jo‘natish” bor, “Fayl:” yo‘q → jo‘natilmagan (✅ qoldiramiz)
+        # - “Jo‘natish” va “Fayl:” bor → jo‘natilgan (❌ o‘tkazib yuboramiz)
+        # - “Qayta jo‘natish” bor, “Jo‘natish” yo‘q → jo‘natilgan (❌ o‘tkazib yuboramiz)
+        # - “Jo‘natish” ham, “Qayta jo‘natish” ham yo‘q → e’tiborsiz (❌ o‘tkazib yuboramiz)
 
-            # --- Tugash muddati ---
-            deadline = "-"
-            for p in soup.find_all("p", class_="header-title"):
-                if p.find("span") and "Topshiriq muddati" in p.find("span").get_text(strip=True):
-                    deadline = p.get_text(" ", strip=True).replace("Topshiriq muddati", "").strip()
-                    break
+        if has_jonatish and not has_fayl:
+            pass  # jo‘natilmagan — davom etamiz
+        else:
+            return None  # qolgan barcha holatlar e’tiborsiz
 
-            return (title, deadline, url)
+        # --- 5️⃣ Topshiriq nomini topamiz ---
+        title = None
+        for p in soup.find_all("p", class_="header-title"):
+            if p.find("span") and "Topshiriq nomi" in p.find("span").get_text(strip=True):
+                title = p.get_text(" ", strip=True).replace("Topshiriq nomi:", "").strip()
+                break
+        if not title:
+            title = "Noma’lum topshiriq"
+
+        # --- 6️⃣ Tugash muddatini topamiz ---
+        deadline = "-"
+        for p in soup.find_all("p", class_="header-title"):
+            if p.find("span") and "Topshiriq muddati" in p.find("span").get_text(strip=True):
+                deadline = p.get_text(" ", strip=True).replace("Topshiriq muddati", "").strip()
+                break
+
+        return (title, deadline, url)
 
     except Exception:
         return None
@@ -156,7 +169,6 @@ def find_unfinished_assignments(session, start_id=6343, end_id=6643):
                 unfinished.append(result)
 
     return unfinished
-
 
 # === 4. /start komandasi ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -296,6 +308,3 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
-
-
-
