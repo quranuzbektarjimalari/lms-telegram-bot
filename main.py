@@ -92,7 +92,7 @@ def find_unfinished_tests(session, start_id=1004, end_id=1304):
     unfinished = []
     urls = [f"{base_url}{i}" for i in range(start_id, end_id + 1)]
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(check_test, session, url) for url in urls]
         for future in as_completed(futures):
             result = future.result()
@@ -308,4 +308,5 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
 
