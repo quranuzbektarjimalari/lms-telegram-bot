@@ -302,7 +302,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif stage == "password":
         login = user_data[chat_id]["login"]
         password = text
-        await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, 1 daqiqa kuting...")
+        await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, 1 daqiqacha kuting...")
 
         session, fullname, error = login_to_lms(login, password)
         if error:
@@ -360,6 +360,7 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
 
 
 
