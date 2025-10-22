@@ -1,4 +1,4 @@
-import nest_asyncio, asyncio, requests, json, os
+import nest_asyncio, asyncio, requests
 from bs4 import BeautifulSoup
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
@@ -222,64 +222,12 @@ def find_unfinished_assignments(session, start_id=6343, end_id=6643):
 
 # === 4. /start komandasi ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
     user_data[update.effective_chat.id] = {"stage": "login"}
-    full_name = update.message.from_user.full_name
-    save_user(user_id, full_name)
     await update.message.reply_text(
         "👋 Assalomu alaykum! LMS vazifalarini tekshiruvchi botga xush kelibsiz. Botdan foydalanish uchun login va parol terish kerak. \n\nIltimos, LMS dagi loginingizni kiriting:"
     )
 from datetime import datetime, timedelta
 import pytz
-
-import json, os
-from datetime import datetime
-
-def save_user(user_id, full_name):
-    file = "user_stats.json"
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    # Eski ma’lumotni o‘qiymiz
-    if os.path.exists(file):
-        with open(file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    else:
-        data = {}
-
-    # Bugungi sana uchun bo‘lim yo‘q bo‘lsa — yaratamiz
-    if today not in data:
-        data[today] = []
-
-    # Foydalanuvchi bugun qayd etilmagan bo‘lsa — qo‘shamiz
-    if user_id not in data[today]:
-        data[today].append(user_id)
-
-    # Yangilangan ma’lumotni yozamiz
-    with open(file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-# === /stat komandasi ===
-async def stat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    admin_id = 314980609  # faqat siz uchun
-
-    if update.effective_user.id != admin_id:
-        await update.message.reply_text("⛔ Ushbu buyruq faqat administrator uchun.")
-        return
-
-    file = "user_stats.json"
-    if not os.path.exists(file):
-        await update.message.reply_text("📊 Hozircha hech kim foydalanmagan.")
-        return
-
-    with open(file, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    msg = "📈 Har kunlik foydalanuvchilar statistikasi:\n\n"
-    for date, users in data.items():
-        msg += f"📅 {date}: {len(users)} ta foydalanuvchi\n"
-
-    await update.message.reply_text(msg)
-
 
 # Tashkent vaqt zonasi
 TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
@@ -406,12 +354,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("stat", stat))   # 🔹 shu joyga ko‘chiring
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
 
     print("🤖 Bot ishga tushdi! Endi Telegramda /start deb yozing.")
     await app.run_polling()
 
 asyncio.run(main())
+
+
+
+
+
+
+
+
 
