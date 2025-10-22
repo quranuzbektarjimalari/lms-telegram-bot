@@ -323,13 +323,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
 
-            # 🕓 Eng yaqin deadline
-            all_items = tests + assignments
-            closest_deadline, closest_diff = find_closest_deadline(all_items)
-            if closest_deadline:
-                remaining = format_timedelta(closest_diff)
-                msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"
-                
             if tests:
                 msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
                 for title, subject, deadline, link in tests:
@@ -341,6 +334,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for title, subject, deadline, link in assignments:
                     msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash vaqti: {deadline}\n👉 {subject}\n\n"
             
+            # 🕓 Eng yaqin deadline
+            all_items = tests + assignments
+            closest_deadline, closest_diff = find_closest_deadline(all_items)
+            if closest_deadline:
+                remaining = format_timedelta(closest_diff)
+                msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
             await update.message.reply_markdown(msg)
 
     # 3. Tugallangan bosqich
@@ -359,6 +358,7 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
 
 
 
