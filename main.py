@@ -224,7 +224,7 @@ def find_unfinished_assignments(session, start_id=6343, end_id=6643):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data[update.effective_chat.id] = {"stage": "login"}
     await update.message.reply_text(
-        "👋 Assalomu alaykum! IIAU LMS botiga xush kelibsiz. Botdan foydalanish uchun ro‘yxatdan o‘tish kerak. \n\nIltimos, LMS dagi loginingizni kiriting:"
+        "👋 Assalomu alaykum! LMS vazifalarini tekshiruvchi botga xush kelibsiz. Botdan foydalanish uchun login va parol terish kerak. \n\nIltimos, LMS dagi loginingizni kiriting:"
     )
 from datetime import datetime, timedelta
 import pytz
@@ -287,7 +287,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
     if chat_id not in user_data:
-        await update.message.reply_text("Boshlash uchun /start deb yozing va ro‘yxatdan o‘ting.")
+        await update.message.reply_text("Boshlash uchun /start deb yozing va login-parol kiriting.")
         return
 
     stage = user_data[chat_id]["stage"]
@@ -360,6 +360,7 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
 
 
 
