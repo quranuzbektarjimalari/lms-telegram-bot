@@ -339,7 +339,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             closest_deadline, closest_diff = find_closest_deadline(all_items)
             if closest_deadline:
                 remaining = format_timedelta(closest_diff)
-                msg += f"```lms.iiau.uz ⏰Eng yaqin deadline: {remaining}dan keyin tugadi! ``` \n\n"
+                msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline {remaining}dan keyin tugaydi! ``` \n\n"
 
             await update.message.reply_markdown(msg)
 
@@ -359,6 +359,7 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
 
 
 
