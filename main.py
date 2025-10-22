@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 nest_asyncio.apply()
 
-BOT_TOKEN = "8086716853:AAEKBw48xkLITfBQabZVt7iOzL_JaTBAVo8"
+BOT_TOKEN = "8469849269:AAHWt3-X4peInBtbPNgDQSuLL1su1cyo7WE"
 user_data = {}
 
 # === 1. LMS tizimiga kirish ===
@@ -360,4 +360,5 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
 
