@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 nest_asyncio.apply()
 
-BOT_TOKEN = "8469849269:AAE3sJkk8-a-LFeWSQARdWki1-3-oVk1DPE"
+BOT_TOKEN = "8086716853:AAEKBw48xkLITfBQabZVt7iOzL_JaTBAVo8"
 user_data = {}
 
 # === 1. LMS tizimiga kirish ===
@@ -56,7 +56,6 @@ def fast_check_exists(session, url):
     except:
         return False
 
-
 # === 2. Qilinmagan testlarni topish (HEAD bilan tezlashtirilgan) ===
 def check_test(session, url):
     try:
@@ -82,10 +81,34 @@ def check_test(session, url):
                 if span_tag:
                     deadline = span_tag.get_text(strip=True)
 
-            return (title, deadline, url)
+        # --- 7️⃣ Fan nomini olish ---
+            subject = "-"
+            try:
+                # "Orqaga" tugmasi joylashgan divni topamiz
+                header_div = soup.find("div", class_="page-title text-right page-title--space")
+                if header_div:
+                  back_link = header_div.find("a", href=True)
+                  if back_link:
+                    href = back_link["href"].strip()
+                    # to‘liq URL yasaymiz
+                    if href.startswith("http"):
+                        back_url = href
+                    else:
+                        back_url = "https://lms.iiau.uz" + href
+                    
+                    # "Orqaga" sahifasini ochamiz
+                    back_page = session.get(back_url, timeout=5)
+                    if back_page.status_code == 200:
+                        back_soup = BeautifulSoup(back_page.text, "html.parser")
+                        div_tag = back_soup.find("div", class_="page-title")
+                        if div_tag and div_tag.get_text(strip=True):
+                            subject = div_tag.get_text(strip=True)
+            except:
+              pass
+
+            return (title, subject, deadline, url)
     except Exception:
         return None
-
 
 def find_unfinished_tests(session, start_id=1004, end_id=1304):
     base_url = "https://lms.iiau.uz/student/my-course/calendar/resource/test/"
@@ -149,7 +172,34 @@ def check_assignment(session, url, resend_variants):
                 deadline = p.get_text(" ", strip=True).replace("Topshiriq muddati", "").strip()
                 break
 
-        return (title, deadline, url)
+        # --- 7️⃣ Fan nomini olish ---
+            subject = "-"
+            try:
+                # "Orqaga" tugmasi joylashgan divni topamiz
+                header_div = soup.find("div", class_="page-title text-right page-title--space")
+                if header_div:
+                  back_link = header_div.find("a", href=True)
+                  if back_link:
+                    href = back_link["href"].strip()
+                    # to‘liq URL yasaymiz
+                    if href.startswith("http"):
+                        back_url = href
+                    else:
+                        back_url = "https://lms.iiau.uz" + href
+                    
+                    # "Orqaga" sahifasini ochamiz
+                    back_page = session.get(back_url, timeout=5)
+                    if back_page.status_code == 200:
+                        back_soup = BeautifulSoup(back_page.text, "html.parser")
+                        div_tag = back_soup.find("div", class_="page-title")
+                        if div_tag and div_tag.get_text(strip=True):
+                            subject = div_tag.get_text(strip=True)
+            except:
+              pass
+
+
+        # 🔚 Natijani fan nomi bilan qaytaramiz
+        return (title, subject, deadline, url)
 
     except Exception:
         return None
@@ -190,7 +240,7 @@ def find_closest_deadline(items):
     closest_dt = None
     closest_diff = None
 
-    for title, deadline_str, link in items:
+    for title, subject, deadline_str, link in items:
         try:
             # deadline stringni Tashkent vaqti bilan o‘qish
             dt = datetime.strptime(deadline_str.strip(), "%d-%m-%Y %H:%M:%S")
@@ -282,13 +332,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if tests:
                 msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
-                for title, deadline, link in tests:
-                    msg += f"📘 *{title}*\n🕒 Tugash vaqti: {deadline}\n👉 [Testni ko‘rish]({link})\n\n"
+                for title, subject, deadline, link in tests:
+                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash vaqti: {deadline}\n👉 {subject}\n\n"
+
 
             if assignments:
                 msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
-                for title, deadline, link in assignments:
-                    msg += f"📘 *{title}*\n🕒 Tugash vaqti: {deadline}\n👉 [Topshiriqni ko‘rish]({link})\n\n"
+                for title, subject, deadline, link in assignments:
+                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash vaqti: {deadline}\n👉 {subject}\n\n"
+
 
             await update.message.reply_markdown(msg)
 
@@ -308,5 +360,4 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
-
 
