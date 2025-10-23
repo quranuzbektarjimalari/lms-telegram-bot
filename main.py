@@ -9,19 +9,36 @@ nest_asyncio.apply()
 BOT_TOKEN = "8469849269:AAHWt3-X4peInBtbPNgDQSuLL1su1cyo7WE"
 user_data = {}
 
-# === 1. LMS tizimiga kirish ===
+# === 1. LMS tizimiga kirish (brauzerdek ishlaydigan sessiya) ===
 def login_to_lms(username, password):
     session = requests.Session()
     login_url = "https://lms.iiau.uz/auth/login"
 
-    response = session.get(login_url)
-    if response.status_code != 200:
-        return None, "❌ LMS sahifasiga ulanib bo‘lmadi."
+    # 💻 Brauzer headers – sayt bot emas, foydalanuvchi kiryapti deb o‘ylaydi
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/128.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "uz-UZ,uz;q=0.9,en;q=0.8,ru;q=0.7",
+        "Connection": "keep-alive",
+        "Referer": "https://lms.iiau.uz/auth/login",
+        "Upgrade-Insecure-Requests": "1",
+    }
 
+    # 1️⃣ Login sahifasini olish
+    response = session.get(login_url, headers=headers)
+    if response.status_code != 200:
+        return None, None, "❌ LMS sahifasiga ulanib bo‘lmadi."
+
+    # 2️⃣ Tokenni olish
     soup = BeautifulSoup(response.text, "html.parser")
     token_tag = soup.find("input", {"name": "_token"})
     token = token_tag["value"] if token_tag else ""
 
+    # 3️⃣ Login so‘rovini yuborish
     payload = {
         "_token": token,
         "login": username,
@@ -29,12 +46,13 @@ def login_to_lms(username, password):
         "g-recaptcha-response": ""
     }
 
-    login_response = session.post(login_url, data=payload)
+    login_response = session.post(login_url, data=payload, headers=headers)
+
+    # 4️⃣ Kirish muvaffaqiyatli bo‘lganini tekshirish
     if "logout" in login_response.text or "Chiqish" in login_response.text:
-        # foydalanuvchi ismini olishga urinish
         fullname = "Noma’lum foydalanuvchi"
         try:
-            dashboard = session.get("https://lms.iiau.uz/dashboard", timeout=10)
+            dashboard = session.get("https://lms.iiau.uz/dashboard", headers=headers, timeout=10)
             prof_soup = BeautifulSoup(dashboard.text, "html.parser")
             span_tag = prof_soup.select_one("button#dropLogin span")
             if span_tag and span_tag.get_text(strip=True):
@@ -358,17 +376,5 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
-
-
-
-
-
-
-
-
-
-
-
-
 
 
