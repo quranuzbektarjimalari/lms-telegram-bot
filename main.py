@@ -1,13 +1,104 @@
-import nest_asyncio, asyncio, requests
+import os
+import json
+import nest_asyncio
+import asyncio
+import requests
 from bs4 import BeautifulSoup
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
+import pytz
+
+# Encryption
+from cryptography.fernet import Fernet
 
 nest_asyncio.apply()
 
-BOT_TOKEN = "8469849269:AAHWt3-X4peInBtbPNgDQSuLL1su1cyo7WE"
+# BOT_TOKEN should be set in environment for safety. Fallback to previous token only if env missing.
+BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8469849269:AAHWt3-X4peInBtbPNgDQSuLL1su1cyo7WE"
+
+# Files for storing encrypted credentials
+CRED_FILE = "credentials.json"
+KEY_FILE = "secret.key"
+
+# In-memory user data (session state)
 user_data = {}
+
+# Tashkent timezone
+TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
+
+# UI buttons (Reply keyboard)
+keyboard = ReplyKeyboardMarkup(
+    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("🔄 Qayta tizimga kirish")]],
+    resize_keyboard=True,
+)
+
+
+# ------------------ Encryption helpers ------------------
+
+def ensure_key():
+    """Ensure a Fernet key exists on disk and return Fernet instance."""
+    if not os.path.exists(KEY_FILE):
+        key = Fernet.generate_key()
+        with open(KEY_FILE, "wb") as f:
+            f.write(key)
+    else:
+        with open(KEY_FILE, "rb") as f:
+            key = f.read()
+    return Fernet(key)
+
+
+def load_all_credentials():
+    """Load and decrypt all credentials from disk. Returns dict chat_id -> {login, password}.
+    If file missing, returns {}.
+    """
+    if not os.path.exists(CRED_FILE):
+        return {}
+    try:
+        with open(CRED_FILE, "rb") as f:
+            encrypted = f.read()
+        if not encrypted:
+            return {}
+        fernet = ensure_key()
+        data_json = fernet.decrypt(encrypted).decode("utf-8")
+        return json.loads(data_json)
+    except Exception:
+        # If decryption fails, don't crash — return empty and warn later
+        return {}
+
+
+def save_all_credentials(all_creds: dict):
+    """Encrypt and write all credentials to disk."""
+    try:
+        fernet = ensure_key()
+        j = json.dumps(all_creds)
+        token = fernet.encrypt(j.encode("utf-8"))
+        with open(CRED_FILE, "wb") as f:
+            f.write(token)
+        return True
+    except Exception:
+        return False
+
+
+def get_credentials_for(chat_id):
+    allc = load_all_credentials()
+    return allc.get(str(chat_id))
+
+
+def set_credentials_for(chat_id, login, password):
+    allc = load_all_credentials()
+    allc[str(chat_id)] = {"login": login, "password": password}
+    return save_all_credentials(allc)
+
+
+def delete_credentials_for(chat_id):
+    allc = load_all_credentials()
+    if str(chat_id) in allc:
+        allc.pop(str(chat_id))
+        return save_all_credentials(allc)
+    return True
+
 
 # === 1. LMS tizimiga kirish (brauzerdek ishlaydigan sessiya) ===
 def login_to_lms(username, password):
@@ -67,12 +158,16 @@ def login_to_lms(username, password):
 
 # === ⚡ Tezkor HEAD tekshiruvi ===
 def fast_check_exists(session, url):
-    """Sahifa mavjudligini HEAD orqali tezda tekshiradi"""
     try:
         head = session.head(url, timeout=3)
         return head.status_code == 200
     except:
-        return False
+        # Fallback: try GET with tiny timeout
+        try:
+            r = session.get(url, timeout=3)
+            return r.status_code == 200
+        except:
+            return False
 
 # === 2. Qilinmagan testlarni topish (HEAD bilan tezlashtirilgan) ===
 def check_test(session, url):
@@ -238,17 +333,7 @@ def find_unfinished_assignments(session, start_id=6343, end_id=6643):
 
     return unfinished
 
-# === 4. /start komandasi ===
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_data[update.effective_chat.id] = {"stage": "login"}
-    await update.message.reply_text(
-        "👋 Assalomu alaykum! LMS vazifalarini tekshiruvchi botga xush kelibsiz. Botdan foydalanish uchun login va parol terish kerak. \n\nIltimos, LMS dagi loginingizni kiriting:"
-    )
-from datetime import datetime, timedelta
-import pytz
-
-# Tashkent vaqt zonasi
-TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
+# === 4. Vaqt yordamchisi ===
 
 def find_closest_deadline(items):
     """
@@ -322,84 +407,137 @@ def days_left_text(deadline_str):
         return ""
 
 
-# === 5. Xabarlarni qayta ishlash ===
+# === 5. Ishlov beruvchilar ===
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    # Show keyboard and check if credentials exist
+    creds = get_credentials_for(chat_id)
+    if creds:
+        await update.message.reply_text(
+            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. Quyidagi tugmalardan foydalaning:",
+            reply_markup=keyboard,
+        )
+    else:
+        # ask for login/password as before
+        user_data[chat_id] = {"stage": "login"}
+        await update.message.reply_text(
+            "👋 Assalomu alaykum! Botga xush kelibsiz. Botdan foydalanish uchun login va parol kiritish. \n\nIltimos, LMS dagi loginingizni kiriting:",
+            reply_markup=keyboard,
+        )
+
+# === 6. Xabarlarni qayta ishlash ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
 
-    if chat_id not in user_data:
-        await update.message.reply_text("Boshlash uchun /start deb yozing va login-parol kiriting.")
-        return
-
-    stage = user_data[chat_id]["stage"]
-
-    # 1. Login bosqichi
-    if stage == "login":
-        user_data[chat_id]["login"] = text
-        user_data[chat_id]["stage"] = "password"
-        await update.message.reply_text("🔑 Endi parolingizni kiriting:")
-
-    # 2. Parol bosqichi
-    elif stage == "password":
-        login = user_data[chat_id]["login"]
-        password = text
+    # Button: Vazifalarni tekshirish
+    if text == "✅ Vazifalarni tekshirish":
+        creds = get_credentials_for(chat_id)
+        if not creds:
+            await update.message.reply_text("Siz tizimga kirmagansiz. Iltimos /start orqali login va parolingizni kiriting.")
+            return
         await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, 1 daqiqacha kuting...")
-
-        session, fullname, error = login_to_lms(login, password)
+        session, fullname, error = login_to_lms(creds["login"], creds["password"])
         if error:
             await update.message.reply_text(error)
-            user_data.pop(chat_id, None)
             return
-
         tests = find_unfinished_tests(session)
         assignments = find_unfinished_assignments(session)
+        await send_results(update, fullname, tests, assignments)
+        return
 
-        user_data[chat_id]["stage"] = "done"
-
-        if not tests and not assignments:
+    # Button: Qayta tizimga kirish
+    if text == "🔄 Qayta tizimga kirish":
+        # Remove credentials and reset state
+        ok = delete_credentials_for(chat_id)
+        user_data.pop(chat_id, None)
+        if ok:
             await update.message.reply_text(
-                f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
-                parse_mode="Markdown",
+                "Siz tizimdan chiqdingiz. Iltimos, /start qilib qaytadan tizimga kiring.",
+                reply_markup=keyboard,
             )
         else:
-            msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
+            await update.message.reply_text("Xato: login/parolni o‘chirib bo‘lmadi. Administratorga murojaat qiling.")
+        return
 
-            if tests:
-                msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
-                for title, subject, deadline, link in tests:
-                    left = days_left_text(deadline)
-                    # Soatni "23:00" ko‘rinishida formatlaymiz
-                    try:
-                      short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
-                    except Exception:
-                      short_deadline = deadline
-                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+    # If user in interactive login flow
+    if chat_id in user_data and user_data[chat_id].get("stage"):
+        stage = user_data[chat_id]["stage"]
+
+        if stage == "login":
+            user_data[chat_id]["login"] = text
+            user_data[chat_id]["stage"] = "password"
+            await update.message.reply_text("🔑 Endi parolingizni kiriting:")
+            return
+
+        if stage == "password":
+            login = user_data[chat_id]["login"]
+            password = text
+            await update.message.reply_text("⏳ Tizimga kirish tekshirilmoqda...")
+            
+            session, fullname, error = login_to_lms(login, password)
+            if error:
+              await update.message.reply_text(error)
+              user_data.pop(chat_id, None)
+              return
+            # ✅ Login-parolni saqlaymiz
+            saved = set_credentials_for(chat_id, login, password)
+            if not saved:
+              await update.message.reply_text("⚠️ Ogohlantirish: login-parolingizni saqlashda xatolik yuz berdi. Qayta kiritishni amalga oshirish kerak."
+              )
+            user_data.pop(chat_id, None)  # jarayonni tozalaymiz
+            await update.message.reply_text(
+                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\n"
+                "Iltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing.",
+                reply_markup=keyboard,
+                )
+
+            return
+    # Default response if unknown text
+    await update.message.reply_text(
+        "Iltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing.", reply_markup=keyboard
+        )
 
 
-            if assignments:
-                msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
-                for title, subject, deadline, link in assignments:
-                    left = days_left_text(deadline)
-                    try:
-                      short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
-                    except Exception:
-                      short_deadline = deadline                  
-                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+async def send_results(update: Update, fullname, tests, assignments):
+    if not tests and not assignments:
+        await update.message.reply_text(
+            f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
+            parse_mode="Markdown",
+        )
+    else:
+      msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
+    
+    if tests:
+        msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
+        for title, subject, deadline, link in tests:
+            left = days_left_text(deadline)
+            # Soatni "23:00" ko‘rinishida formatlaymiz
+            try:
+                short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
+            except Exception:
+                short_deadline = deadline
+                msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+
+    if assignments:
+        msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
+        for title, subject, deadline, link in assignments:
+            left = days_left_text(deadline)
+            try:
+                short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
+            except Exception:
+                short_deadline = deadline                  
+            msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
             
             # 🕓 Eng yaqin deadline
-            all_items = tests + assignments
-            closest_deadline, closest_diff = find_closest_deadline(all_items)
-            if closest_deadline:
-                remaining = format_timedelta(closest_diff)
-                msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
-            await update.message.reply_markdown(msg)
+    all_items = tests + assignments
+    closest_deadline, closest_diff = find_closest_deadline(all_items)
+    if closest_deadline:
+        remaining = format_timedelta(closest_diff)
+        msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
+    await update.message.reply_markdown(msg)
             
-    # 3. Tugallangan bosqich
-    elif stage == "done":
-        await update.message.reply_text(
-            "🔐 Siz avval LMS tekshiruvini yakunlagansiz.\n"
-            "Agar yana tekshirishni xohlasangiz, /start deb yozing va qayta login qiling."
-        )
+
 # === 6. Botni ishga tushirish ===
 async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -409,7 +547,9 @@ async def main():
     print("🤖 Bot ishga tushdi! Endi Telegramda /start deb yozing.")
     await app.run_polling()
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
 
 
