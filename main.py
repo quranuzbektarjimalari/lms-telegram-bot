@@ -30,7 +30,7 @@ TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 
 # UI buttons (Reply keyboard)
 keyboard = ReplyKeyboardMarkup(
-    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("🔄 Qayta tizimga kirish")]],
+    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("🔐 Tizimga kirish/chiqish")]],
     resize_keyboard=True,
 )
 
@@ -434,7 +434,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "✅ Vazifalarni tekshirish":
         creds = get_credentials_for(chat_id)
         if not creds:
-            await update.message.reply_text("Siz tizimga kirmagansiz. Iltimos /start orqali login va parolingizni kiriting.")
+            await update.message.reply_text("Siz tizimga kirmagansiz. Iltimos, /start qilib login va parol orqali tizimga kiriting.")
             return
         await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, 1 daqiqacha kuting...")
         session, fullname, error = login_to_lms(creds["login"], creds["password"])
@@ -446,8 +446,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_results(update, fullname, tests, assignments)
         return
 
-    # Button: Qayta tizimga kirish
-    if text == "🔄 Qayta tizimga kirish":
+    # Button: Tizimga kirish/chiqish
+    if text == "🔐 Tizimga kirish/chiqish":
         # Remove credentials and reset state
         ok = delete_credentials_for(chat_id)
         user_data.pop(chat_id, None)
@@ -507,27 +507,26 @@ async def send_results(update: Update, fullname, tests, assignments):
         )
     else:
       msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
-    
-    if tests:
-        msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
-        for title, subject, deadline, link in tests:
-            left = days_left_text(deadline)
-            # Soatni "23:00" ko‘rinishida formatlaymiz
-            try:
-                short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
-            except Exception:
-                short_deadline = deadline
+        if tests:
+            msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
+            for title, subject, deadline, link in tests:
+                left = days_left_text(deadline)
+                    # Soatni "23:00" ko‘rinishida formatlaymiz
+                try:
+                    short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
+                except Exception:
+                    short_deadline = deadline
                 msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
 
-    if assignments:
-        msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
-        for title, subject, deadline, link in assignments:
-            left = days_left_text(deadline)
-            try:
-                short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
-            except Exception:
-                short_deadline = deadline                  
-            msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+        if assignments:
+            msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
+            for title, subject, deadline, link in assignments:
+                left = days_left_text(deadline)
+                try:
+                    short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
+                except Exception:
+                    short_deadline = deadline                  
+                msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
             
             # 🕓 Eng yaqin deadline
     all_items = tests + assignments
@@ -550,6 +549,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
