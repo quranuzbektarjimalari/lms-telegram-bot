@@ -500,41 +500,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def send_results(update: Update, fullname, tests, assignments):
-    if not tests and not assignments:
-        await update.message.reply_text(
-            f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
-            parse_mode="Markdown",
-        )
-    else:
-      msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
-        if tests:
-            msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
-            for title, subject, deadline, link in tests:
-                left = days_left_text(deadline)
-                    # Soatni "23:00" ko‘rinishida formatlaymiz
-                try:
-                    short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
-                except Exception:
-                    short_deadline = deadline
-                msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+        if not tests and not assignments:
+            await update.message.reply_text(
+                f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
+                parse_mode="Markdown",
+            )
+        else:
+            msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
 
-        if assignments:
-            msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
-            for title, subject, deadline, link in assignments:
-                left = days_left_text(deadline)
-                try:
-                    short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
-                except Exception:
-                    short_deadline = deadline                  
-                msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+            if tests:
+                msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
+                for title, subject, deadline, link in tests:
+                    left = days_left_text(deadline)
+                    # Soatni "23:00" ko‘rinishida formatlaymiz
+                    try:
+                      short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
+                    except Exception:
+                      short_deadline = deadline
+                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+
+
+            if assignments:
+                msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
+                for title, subject, deadline, link in assignments:
+                    left = days_left_text(deadline)
+                    try:
+                      short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
+                    except Exception:
+                      short_deadline = deadline                  
+                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
             
             # 🕓 Eng yaqin deadline
-    all_items = tests + assignments
-    closest_deadline, closest_diff = find_closest_deadline(all_items)
-    if closest_deadline:
-        remaining = format_timedelta(closest_diff)
-        msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
-    await update.message.reply_markdown(msg)
+            all_items = tests + assignments
+            closest_deadline, closest_diff = find_closest_deadline(all_items)
+            if closest_deadline:
+                remaining = format_timedelta(closest_diff)
+                msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
+            await update.message.reply_markdown(msg)
             
 
 # === 6. Botni ishga tushirish ===
@@ -549,6 +551,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
