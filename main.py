@@ -421,7 +421,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ask for login/password as before
         user_data[chat_id] = {"stage": "login"}
         await update.message.reply_text(
-            "👋 Assalomu alaykum! Botga xush kelibsiz. Botdan foydalanish uchun login va parol kiritish. \n\nIltimos, LMS dagi loginingizni kiriting:",
+            "👋 Assalomu alaykum! Botga xush kelibsiz. Botdan foydalanish uchun login va parol kiritish kerak. \n\nIltimos, LMS dagi loginingizni kiriting:",
             reply_markup=keyboard,
         )
 
@@ -550,6 +550,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
