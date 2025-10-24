@@ -17,7 +17,8 @@ nest_asyncio.apply()
 
 # BOT_TOKEN should be set in environment for safety. Fallback to previous token only if env missing.
 BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8469849269:AAHWt3-X4peInBtbPNgDQSuLL1su1cyo7WE"
-
+# Admin uchun chat ID
+ADMIN_CHAT_ID = 314980609  # bu yerga o'z Telegram ID'ingni yoz
 # Files for storing encrypted credentials
 CRED_FILE = "credentials.json"
 KEY_FILE = "secret.key"
@@ -498,7 +499,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Iltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing.", reply_markup=keyboard
         )
 
+# === Admin buyrug‘i: foydalanuvchilar sonini ko‘rish ===
+async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id != ADMIN_CHAT_ID:
+        return
+    if not os.path.exists(CRED_FILE):
+        await update.message.reply_text("⚠️ credentials.json fayli topilmadi.")
+        return
 
+    with open(CRED_FILE, "rb") as f:
+        encrypted = f.read()
+    if not encrypted:
+        await update.message.reply_text("👥 Hozircha hech kim tizimga kirmagan.")
+        return
+
+    fernet = ensure_key()
+    try:
+        data_json = fernet.decrypt(encrypted).decode("utf-8")
+        creds = json.loads(data_json)
+        count = len(creds)
+        await update.message.reply_text(f"👥 Hozirgi foydalanuvchilar soni: {count}")
+    except Exception:
+        await update.message.reply_text("❌ Foydalanuvchilar ma’lumotini o‘qib bo‘lmadi.")           
+
+# === Vazifalar tekshiruv natijasini ===
 async def send_results(update: Update, fullname, tests, assignments):
         if not tests and not assignments:
             await update.message.reply_text(
@@ -537,13 +561,15 @@ async def send_results(update: Update, fullname, tests, assignments):
                 remaining = format_timedelta(closest_diff)
                 msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
             await update.message.reply_markdown(msg)
-            
+
 
 # === 6. Botni ishga tushirish ===
 async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("users", users))  # 🆕 admin uchun buyruq
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
 
     print("🤖 Bot ishga tushdi! Endi Telegramda /start deb yozing.")
     await app.run_polling()
@@ -551,6 +577,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
