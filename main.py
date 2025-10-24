@@ -299,6 +299,29 @@ def format_timedelta(td: timedelta):
 
     return ", ".join(parts)
 
+
+def days_left_text(deadline_str):
+    try:
+        # Masalan: "25-10-2025 23:00:00"
+        dt = datetime.strptime(deadline_str.strip(), "%d-%m-%Y %H:%M:%S")
+        dt = TASHKENT_TZ.localize(dt)
+        now = datetime.now(TASHKENT_TZ)
+        diff = dt - now
+        days = diff.days
+
+        # O‘tgan sanalar uchun hech narsa chiqmasin
+        if days < 0:
+            return ""
+        elif days == 0:
+            return "(bugun)"
+        elif days == 1:
+            return "(1 kun)"
+        else:
+            return f"({days} kun)"
+    except Exception:
+        return ""
+
+
 # === 5. Xabarlarni qayta ishlash ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -344,13 +367,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if tests:
                 msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
                 for title, subject, deadline, link in tests:
-                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash vaqti: {deadline}\n👉 {subject}\n\n"
+                    left = days_left_text(deadline)
+                    # Soatni "23:00" ko‘rinishida formatlaymiz
+                    try:
+                      short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
+                    except Exception:
+                      short_deadline = deadline
+                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
 
 
             if assignments:
                 msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
                 for title, subject, deadline, link in assignments:
-                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash vaqti: {deadline}\n👉 {subject}\n\n"
+                    left = days_left_text(deadline)
+                    try:
+                      short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
+                    except Exception:
+                      short_deadline = deadline                  
+                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
             
             # 🕓 Eng yaqin deadline
             all_items = tests + assignments
@@ -359,7 +393,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 remaining = format_timedelta(closest_diff)
                 msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
             await update.message.reply_markdown(msg)
-
+            
     # 3. Tugallangan bosqich
     elif stage == "done":
         await update.message.reply_text(
@@ -376,5 +410,6 @@ async def main():
     await app.run_polling()
 
 asyncio.run(main())
+
 
 
