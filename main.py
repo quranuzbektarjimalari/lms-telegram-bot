@@ -438,14 +438,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Siz tizimga kirmagansiz. Iltimos, /start qilib login va parol orqali tizimga kiring.")
             return
         await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, 1 daqiqacha kuting...")
-        session, fullname, error = login_to_lms(creds["login"], creds["password"])
+        loop = asyncio.get_running_loop()
+
+        # login_to_lms funksiyasini alohida thread’da bajarish
+        session, fullname, error = await loop.run_in_executor(
+            None, login_to_lms, creds["login"], creds["password"]
+        )
         if error:
             await update.message.reply_text(error)
             return
-        tests = find_unfinished_tests(session)
-        assignments = find_unfinished_assignments(session)
-        await send_results(update, fullname, tests, assignments)
-        return
+        # find_unfinished_tests va find_unfinished_assignments ham alohida threadda bajariladi
+        tests, assignments = await asyncio.gather(
+            loop.run_in_executor(None, find_unfinished_tests, session),
+            loop.run_in_executor(None, find_unfinished_assignments, session)
+        )
 
     # Button: Tizimga kirish/chiqish
     if text == "🔐 Tizimga kirish/chiqish":
@@ -577,6 +583,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
