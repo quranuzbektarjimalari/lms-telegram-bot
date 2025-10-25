@@ -429,7 +429,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Siz tizimga kirmagansiz. Iltimos, /start qilib login va parol orqali tizimga kiring.")
             return
 
-        await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, 1 daqiqacha kuting...")
+        await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, biroz kuting...")
         loop = asyncio.get_running_loop()
         session, fullname, error = await loop.run_in_executor(GLOBAL_EXECUTOR, login_to_lms, creds["login"], creds["password"])
             
@@ -525,8 +525,55 @@ async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         await update.message.reply_text("❌ Foydalanuvchilar ma’lumotini o‘qib bo‘lmadi.")           
 
+# === Admin xabari: barcha foydalanuvchilarga xabar yuborish ===
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id != ADMIN_CHAT_ID:
+        return  # faqat admin foydalana oladi
+
+    creds = load_all_credentials()
+    if not creds:
+        await update.message.reply_text("⚠️ Hozircha tizimda hech qanday foydalanuvchi yo‘q.")
+        return
+
+    # Admin xabar matnini olamiz
+    if len(context.args) == 0:
+        await update.message.reply_text("✏️ Foydalanish: /broadcast Siz yubormoqchi bo‘lgan xabar matni")
+        return
+
+    message_text = " ".join(context.args)
+
+    success = 0
+    fail = 0
+    for chat_id in creds.keys():
+        try:
+            await context.bot.send_message(chat_id=int(chat_id), text=message_text)
+            success += 1
+            await asyncio.sleep(0.1)  # flood-limitdan qochish
+        except Exception:
+            fail += 1
+            continue
+
+    await update.message.reply_text(
+        f"📢 Xabar yuborildi!\n✅ Muvaffaqiyatli: {success}\n❌ Xatolik: {fail}"
+    )
+
+
 # === Vazifalar tekshiruv natijasini ===
 async def send_results(update: Update, fullname, tests, assignments):
+        def parse_deadline(item):
+          # item: (title, subject, deadline_str, url)
+            try:
+              _, _, deadline_str, _ = item
+              return datetime.strptime(deadline_str.strip(), "%d-%m-%Y %H:%M:%S")
+            except Exception:
+              return datetime.max  # Sana xato bo‘lsa, oxirida tursin
+
+    # 🕒 Testlar va topshiriqlarni tartiblash (eng yaqin muddat birinchi)
+        tests = sorted(tests, key=parse_deadline) if tests else []
+        assignments = sorted(assignments, key=parse_deadline) if assignments else []
+
+        
+
         if not tests and not assignments:
             await update.message.reply_text(
                 f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
@@ -534,9 +581,18 @@ async def send_results(update: Update, fullname, tests, assignments):
             )
         else:
             msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
+            test_count = len(tests)
+            assign_count = len(assignments)
+            count_parts = []
+            if test_count > 0:
+              count_parts.append(f"{test_count} ta test")
+            if assign_count > 0:
+              count_parts.append(f"{assign_count} ta topshiriq")
+            count_text = " va ".join(count_parts)
+            msg += f"❗️ *Sizda {count_text} bajarilmagan👇 *\n\n"
 
             if tests:
-                msg += "❗ *BAJARILMAGAN TESTLAR 👇*\n\n"
+                
                 for title, subject, deadline, link in tests:
                     left = days_left_text(deadline)
                     # Soatni "23:00" ko‘rinishida formatlaymiz
@@ -544,18 +600,18 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline
-                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+                    msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
 
 
             if assignments:
-                msg += "❗ *BAJARILMAGAN TOPSHIRIQLAR 👇*\n\n"
+                
                 for title, subject, deadline, link in assignments:
                     left = days_left_text(deadline)
                     try:
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline                  
-                    msg += f"📘 *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+                    msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
             
             # 🕓 Eng yaqin deadline
             all_items = tests + assignments
@@ -571,6 +627,7 @@ async def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("users", users))  # 🆕 admin uchun buyruq
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(CommandHandler("broadcast", broadcast))
 
 
     print("🤖 Bot ishga tushdi! Endi Telegramda /start deb yozing.")
@@ -579,5 +636,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
