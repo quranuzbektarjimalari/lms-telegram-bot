@@ -20,7 +20,7 @@ GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=20)
 nest_asyncio.apply()
 
 # BOT_TOKEN should be set in environment for safety. Fallback to previous token only if env missing.
-BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8283988514:AAFRMPgyjdkYsMXZaT75lZt0-FCWdaVjoLY"
+BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8469849269:AAHWt3-X4peInBtbPNgDQSuLL1su1cyo7WE"
 # Admin uchun chat ID
 ADMIN_CHAT_ID = 314980609  # bu yerga o'z Telegram ID'ingni yoz
 # Files for storing encrypted credentials
@@ -474,7 +474,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Siz tizimga kirmagansiz. Iltimos, /start qilib login va parol orqali tizimga kiring.")
             return
 
-        await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, biroz kuting...")
+        await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, 1 daqiqacha kuting...")
         loop = asyncio.get_running_loop()
         session, fullname, error = await loop.run_in_executor(GLOBAL_EXECUTOR, login_to_lms, creds["login"], creds["password"])
             
