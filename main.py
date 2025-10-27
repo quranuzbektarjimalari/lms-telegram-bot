@@ -8,18 +8,19 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import pytz
-
-# Encryption
 from cryptography.fernet import Fernet
+import time
 
 # Bitta umumiy pool – barcha foydalanuvchilar uchun
-GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=30)
+GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=20)
 
 nest_asyncio.apply()
 
 # BOT_TOKEN should be set in environment for safety. Fallback to previous token only if env missing.
-BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8469849269:AAHWt3-X4peInBtbPNgDQSuLL1su1cyo7WE"
+BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8283988514:AAFRMPgyjdkYsMXZaT75lZt0-FCWdaVjoLY"
 # Admin uchun chat ID
 ADMIN_CHAT_ID = 314980609  # bu yerga o'z Telegram ID'ingni yoz
 # Files for storing encrypted credentials
@@ -38,7 +39,7 @@ TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 
 # UI buttons (Reply keyboard)
 keyboard = ReplyKeyboardMarkup(
-    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("🔐 Tizimga kirish/chiqish")]],
+    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("🔐 Tizimdan chiqish")]],
     resize_keyboard=True,
 )
 
@@ -109,10 +110,28 @@ def delete_credentials_for(chat_id):
 
 
 # === 1. LMS tizimiga kirish (brauzerdek ishlaydigan sessiya) ===
+
 def login_to_lms(username, password):
-    """Sinxron: LMS ga session bilan kiradi va (session, fullname, error) qaytaradi."""
+    """
+    LMS tizimiga kiradi va (session, fullname, error) ni qaytaradi.
+    20 foydalanuvchigacha parallel ishlash uchun optimallashtirilgan.
+    """
     try:
+        # Session yaratish
         session = requests.Session()
+
+        # ⚙️ HTTPAdapter sozlamalari
+        adapter = HTTPAdapter(
+            pool_connections=50,   # umumiy ulanish slotlari (zaxira bilan)
+            pool_maxsize=50,       # bir vaqtning o‘zida 50 parallel ulanish mumkin
+            max_retries=Retry(
+                total=3,           # xatoda 3 marta qayta urinadi
+                backoff_factor=0.5,
+                status_forcelist=(429, 500, 502, 503, 504)
+            ),
+        )
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
         login_url = "https://lms.iiau.uz/auth/login"
         headers = {
             "User-Agent": (
@@ -190,17 +209,31 @@ def extract_subject_fast(soup):
 
 
 # === ⚡ Tezkor HEAD tekshiruvi ===
-def fast_check_exists(session, url):
-    try:
-        head = session.head(url, timeout=3)
-        return head.status_code == 200
-    except:
-        # Fallback: try GET with tiny timeout
+def fast_check_exists(session, url, retries=3):
+    """
+    URL mavjudligini HEAD va GET so‘rovlari bilan ishonchli tekshiradi.
+    LMS server sekin ishlaganda ham barqaror.
+    """
+    for attempt in range(retries):
         try:
-            r = session.get(url, timeout=3)
-            return r.status_code == 200
-        except:
-            return False
+            res = session.head(url, timeout=(3, 5), allow_redirects=True)
+            if res.status_code in (200, 302):
+                return True
+        except requests.RequestException:
+            pass
+
+        try:
+            res = session.get(url, timeout=(3, 5), allow_redirects=True)
+            if res.status_code in (200, 302):
+                return True
+        except requests.RequestException:
+            if attempt == retries - 1:
+                print(f"[x] HEAD/GET xato: {url}")
+            continue
+
+    return False
+
+
 
 # === 2. Qilinmagan testlarni topish (HEAD bilan tezlashtirilgan) ===
 def check_test(session, url):
@@ -234,19 +267,23 @@ def check_test(session, url):
     except Exception:
         return None
 
-def find_unfinished_tests(session, start_id=1004, end_id=1304):
+
+def find_unfinished_tests(session, start_id=1004, end_id=1304, batch_size=40):
     base_url = "https://lms.iiau.uz/student/my-course/calendar/resource/test/"
     unfinished = []
     urls = [f"{base_url}{i}" for i in range(start_id, end_id + 1)]
 
-    futures = [GLOBAL_EXECUTOR.submit(check_test, session, url) for url in urls]
-    for fut in as_completed(futures):
-        try:
-            res = fut.result()
-            if res:
-                unfinished.append(res)
-        except Exception:
-            continue
+    for i in range(0, len(urls), batch_size):
+        batch = urls[i:i + batch_size]
+        futures = [GLOBAL_EXECUTOR.submit(check_test, session, url) for url in batch]
+        for fut in as_completed(futures):
+            try:
+                res = fut.result()
+                if res:
+                    unfinished.append(res)
+            except Exception:
+                continue
+
     return unfinished
 
 
@@ -307,26 +344,28 @@ def check_assignment(session, url, resend_variants):
         return None
 
 
-def find_unfinished_assignments(session, start_id=6343, end_id=6643):
+def find_unfinished_assignments(session, start_id=6343, end_id=6643, batch_size=40):
     base_url = "https://lms.iiau.uz/student/my-course/calendar/resource/activity/standard-"
     resend_variants = ["Qayta jo'natish", "Qayta jo’natish", "Qayta joʻnatish", "Qayta jo`natish"]
     unfinished = []
     urls = [f"{base_url}{i}" for i in range(start_id, end_id + 1)]
 
-    futures = [GLOBAL_EXECUTOR.submit(check_assignment, session, url, resend_variants) for url in urls]
-    for fut in as_completed(futures):
-        try:
-            res = fut.result()
-            if res:
-                unfinished.append(res)
-        except Exception:
-            continue
+    for i in range(0, len(urls), batch_size):
+        batch = urls[i:i + batch_size]
+        futures = [GLOBAL_EXECUTOR.submit(check_assignment, session, url, resend_variants) for url in batch]
+        for fut in as_completed(futures):
+            try:
+                res = fut.result()
+                if res:
+                    unfinished.append(res)
+            except Exception:
+                continue
+
     return unfinished
 
 
 
 # === 4. Vaqt yordamchisi ===
-
 def find_closest_deadline(items):
     """
     items: [(title, deadline_str, link), ...]
@@ -379,14 +418,20 @@ def format_timedelta(td: timedelta):
 
 def days_left_text(deadline_str):
     try:
-        # Masalan: "25-10-2025 23:00:00"
+        # Masalan: "28-10-2025 23:00:00"
         dt = datetime.strptime(deadline_str.strip(), "%d-%m-%Y %H:%M:%S")
-        dt = TASHKENT_TZ.localize(dt)
-        now = datetime.now(TASHKENT_TZ)
-        diff = dt - now
-        days = diff.days
 
-        # O‘tgan sanalar uchun hech narsa chiqmasin
+        # Tashkent vaqt zonasiga moslashtirish (agar hali qo‘shilmagan bo‘lsa)
+        if dt.tzinfo is None:
+            dt = TASHKENT_TZ.localize(dt)
+
+        # Hozirgi vaqt (Tashkent)
+        now = datetime.now(TASHKENT_TZ)
+
+        # Faqat kalendar kunlarni solishtiramiz
+        days = (dt.date() - now.date()).days
+
+        # Natija
         if days < 0:
             return ""
         elif days == 0:
@@ -556,7 +601,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📢 Xabar yuborildi!\n✅ Muvaffaqiyatli: {success}\n❌ Xatolik: {fail}"
     )
-
 
 # === Vazifalar tekshiruv natijasini ===
 async def send_results(update: Update, fullname, tests, assignments):
