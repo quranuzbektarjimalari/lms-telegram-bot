@@ -1,7 +1,7 @@
 python-telegram-bot==20.6
+nest_asyncio
 requests
 beautifulsoup4
-nest_asyncio
 pytz
 cryptography
-
+urllib3
