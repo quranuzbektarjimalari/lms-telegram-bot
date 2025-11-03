@@ -25,7 +25,7 @@ GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=30)
 nest_asyncio.apply()
 
 # BOT_TOKEN should be set in environment for safety. Fallback to previous token only if env missing.
-BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8469849269:AAHWt3-X4peInBtbPNgDQSuLL1su1cyo7WE"
+BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8283988514:AAFRMPgyjdkYsMXZaT75lZt0-FCWdaVjoLY"
 # Admin uchun chat ID
 ADMIN_CHAT_ID = 314980609  # bu yerga o'z Telegram ID'ingni yoz
 # Files for storing encrypted credentials
