@@ -423,9 +423,9 @@ def days_left_text(deadline_str):
         elif days == 0:
             return "(bugun)"
         elif days == 1:
-            return "(1 kun qoldi)"
+            return "(1 kun)"
         else:
-            return f"({days} kun qoldi)"
+            return f"({days} kun)"
     except Exception:
         return ""
 
@@ -437,7 +437,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     creds = get_credentials_for(chat_id)
     if creds:
         await update.message.reply_text(
-            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. \nIltimos, menyudagi tugmalardan foydalaning:",
+            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. Quyidagi tugmalardan foydalaning:",
             reply_markup=keyboard,
         )
     else:
@@ -522,7 +522,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             user_data.pop(chat_id, None)
             await update.message.reply_text(
-                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nIltimos, menyudagi tugmalardan birini tanlang: ",
+                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nIltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing.",
                 reply_markup=keyboard,
             )
             return
@@ -607,11 +607,11 @@ async def send_results(update: Update, fullname, tests, assignments):
 
         if not tests and not assignments:
             await update.message.reply_text(
-                f"👤 Hurmatli {fullname}! \n\n✅ *SIZDA BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
+                f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
                 parse_mode="Markdown",
             )
         else:
-            msg = f"👤 Hurmatli {fullname}! \n\n"
+            msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
             test_count = len(tests)
             assign_count = len(assignments)
             count_parts = []
@@ -620,7 +620,7 @@ async def send_results(update: Update, fullname, tests, assignments):
             if assign_count > 0:
               count_parts.append(f"{assign_count} ta topshiriq")
             count_text = " va ".join(count_parts)
-            msg += f"❗️ *Sizda hozircha {count_text} bajarilmagan👇 *\n\n"
+            msg += f"❗️ *Sizda {count_text} bajarilmagan👇 *\n\n"
 
             if tests:
                 
@@ -631,7 +631,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline
-                    msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n⏱️ Tugash: {short_deadline} _{left}_ \n📓 Fan: {subject}\n\n"
+                    msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
 
 
             if assignments:
@@ -642,8 +642,15 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline                  
-                    msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n⏱️ Tugash: {short_deadline} _{left}_ \n📓 Fan: {subject}\n\n"
+                    msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
             
+            # 🕓 Eng yaqin deadline
+            all_items = tests + assignments
+            closest_deadline, closest_diff = find_closest_deadline(all_items)
+            if closest_deadline:
+                remaining = format_timedelta(closest_diff)
+                msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
+            await update.message.reply_markdown(msg)
 
 # === 6. Botni ishga tushirish ===
 async def main():
