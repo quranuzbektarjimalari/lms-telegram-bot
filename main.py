@@ -423,9 +423,9 @@ def days_left_text(deadline_str):
         elif days == 0:
             return "(bugun)"
         elif days == 1:
-            return "(1 kun)"
+            return "_(1 kun qoldi)_"
         else:
-            return f"({days} kun)"
+            return f"_({days} kun qoldi)_"
     except Exception:
         return ""
 
@@ -437,7 +437,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     creds = get_credentials_for(chat_id)
     if creds:
         await update.message.reply_text(
-            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. Quyidagi tugmalardan foydalaning:",
+            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. Endi menyudagi tugmalardan foydalaning: ",
             reply_markup=keyboard,
         )
     else:
@@ -522,14 +522,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             user_data.pop(chat_id, None)
             await update.message.reply_text(
-                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nIltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing.",
+                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nIltimos, menyudagi tugmalardan birini tanlang: ",
                 reply_markup=keyboard,
             )
             return
 
     # Default response
     await update.message.reply_text(
-        "Iltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing.", reply_markup=keyboard
+        "Iltimos, menyudagi tugmalardan birini tanlang: ", reply_markup=keyboard
     )
 
 
@@ -607,11 +607,11 @@ async def send_results(update: Update, fullname, tests, assignments):
 
         if not tests and not assignments:
             await update.message.reply_text(
-                f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
+                f"👤 Hurmatli {fullname}! \n\n✅ *SIZDA BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
                 parse_mode="Markdown",
             )
         else:
-            msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
+            msg = f"👤 Hurmatli {fullname}! \n\n"
             test_count = len(tests)
             assign_count = len(assignments)
             count_parts = []
@@ -631,7 +631,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline
-                    msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+                    msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n⏱️ Tugash: {short_deadline} {left} \n📓 Fan: {subject}\n\n"
 
 
             if assignments:
@@ -642,7 +642,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline                  
-                    msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+                    msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n⏱️ Tugash: {short_deadline} {left}\n📓 Fan: {subject}\n\n"
             
             # 🕓 Eng yaqin deadline
             all_items = tests + assignments
