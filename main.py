@@ -522,14 +522,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             user_data.pop(chat_id, None)
             await update.message.reply_text(
-                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nIltimos, menyudagi tugmalardan birini tanlang! ",
+                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nEndi menyudagi tugmalardan birini tanlang! ",
                 reply_markup=keyboard,
             )
             return
 
     # Default response
     await update.message.reply_text(
-        "Iltimos, menyudagi tugmalardan birini tanlang! ", reply_markup=keyboard
+        "Iltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing! ", reply_markup=keyboard
     )
 
 
