@@ -423,9 +423,9 @@ def days_left_text(deadline_str):
         elif days == 0:
             return "(bugun)"
         elif days == 1:
-            return "(1 kun)"
+            return "(1 kun qoldi)"
         else:
-            return f"({days} kun)"
+            return f"({days} kun qoldi)"
     except Exception:
         return ""
 
@@ -437,7 +437,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     creds = get_credentials_for(chat_id)
     if creds:
         await update.message.reply_text(
-            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. Quyidagi tugmalardan foydalaning:",
+            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. Iltimos, menyudagi tugmalardan foydalaning:",
             reply_markup=keyboard,
         )
     else:
@@ -522,7 +522,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             user_data.pop(chat_id, None)
             await update.message.reply_text(
-                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nIltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing.",
+                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nIltimos, menyudagi tugmalardan birini tanlang: ",
                 reply_markup=keyboard,
             )
             return
@@ -631,7 +631,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline
-                    msg += f"📘 Test: _{title}_ ([ko‘rish]({link}))\n🕒 Tugash: {short_deadline} {left} qoldi\n📖 Fan: {subject}\n\n"
+                    msg += f"📘 Test: _{title} ([ko‘rish]({link}))_\n🕒 Tugash: {short_deadline} {left} \n📖 Fan: {subject}\n\n"
 
 
             if assignments:
@@ -642,15 +642,8 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline                  
-                    msg += f"📕 Topshiriq: _{title}_ ([ko‘rish]({link}))\n🕒 Tugash: {short_deadline} {left} qoldi\n📖 Fan: {subject}\n\n"
+                    msg += f"📕 Topshiriq: _{title}_ ([ko‘rish]({link}))_\n🕒 Tugash: {short_deadline} {left} \n📖 Fan: {subject}\n\n"
             
-            # 🕓 Eng yaqin deadline
-            all_items = tests + assignments
-            closest_deadline, closest_diff = find_closest_deadline(all_items)
-            if closest_deadline:
-                remaining = format_timedelta(closest_diff)
-                msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
-            await update.message.reply_markdown(msg)
 
 # === 6. Botni ishga tushirish ===
 async def main():
