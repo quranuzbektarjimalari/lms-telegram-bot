@@ -421,11 +421,11 @@ def days_left_text(deadline_str):
         if days < 0:
             return ""
         elif days == 0:
-            return "(bugun)"
+            return "_(bugun tugaydi)_"
         elif days == 1:
-            return "(1 kun)"
+            return "_(1 kun qoldi)_"
         else:
-            return f"({days} kun)"
+            return f"_({days} kun qoldi)_"
     except Exception:
         return ""
 
@@ -437,7 +437,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     creds = get_credentials_for(chat_id)
     if creds:
         await update.message.reply_text(
-            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. Quyidagi tugmalardan foydalaning:",
+            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. \n\nIltimos, menyudagi tugmalardan birini tanlang.",
             reply_markup=keyboard,
         )
     else:
@@ -522,7 +522,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             user_data.pop(chat_id, None)
             await update.message.reply_text(
-                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nIltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing.",
+                f"✅ {fullname}, tizimga muvaffaqiyatli kirdingiz!\n\nIltimos, menyudagi tugmalardan birini tanlang. ",
                 reply_markup=keyboard,
             )
             return
