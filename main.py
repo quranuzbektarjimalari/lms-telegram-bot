@@ -437,7 +437,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     creds = get_credentials_for(chat_id)
     if creds:
         await update.message.reply_text(
-            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. Iltimos, menyudagi tugmalardan foydalaning:",
+            "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. \nIltimos, menyudagi tugmalardan foydalaning:",
             reply_markup=keyboard,
         )
     else:
@@ -631,7 +631,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline
-                    msg += f"📘 Test: _{title} ([ko‘rish]({link}))_\n🕒 Tugash: {short_deadline} {left} \n📖 Fan: {subject}\n\n"
+                    msg += f"📘 Test: _{title}_ _([ko‘rish]({link}))_\n⏱️ Tugash: {short_deadline} _{left}_ \n📓 Fan: {subject}\n\n"
 
 
             if assignments:
@@ -642,7 +642,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline                  
-                    msg += f"📕 Topshiriq: _{title}_ ([ko‘rish]({link}))_\n🕒 Tugash: {short_deadline} {left} \n📖 Fan: {subject}\n\n"
+                    msg += f"📕 Topshiriq: _{title}_ _([ko‘rish]({link}))_\n⏱️ Tugash: {short_deadline} _{left}_ \n📓 Fan: {subject}\n\n"
             
 
 # === 6. Botni ishga tushirish ===
