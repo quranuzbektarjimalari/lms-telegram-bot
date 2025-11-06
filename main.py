@@ -607,11 +607,11 @@ async def send_results(update: Update, fullname, tests, assignments):
 
         if not tests and not assignments:
             await update.message.reply_text(
-                f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
+                f"👤 Hurmatli {fullname}! \n\n✅ *SIZDA BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
                 parse_mode="Markdown",
             )
         else:
-            msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
+            msg = f"👤 Hurmatli {fullname}! \n\n"
             test_count = len(tests)
             assign_count = len(assignments)
             count_parts = []
@@ -620,7 +620,7 @@ async def send_results(update: Update, fullname, tests, assignments):
             if assign_count > 0:
               count_parts.append(f"{assign_count} ta topshiriq")
             count_text = " va ".join(count_parts)
-            msg += f"❗️ *Sizda {count_text} bajarilmagan👇 *\n\n"
+            msg += f"❗️ *Sizda hozircha {count_text} bajarilmagan👇 *\n\n"
 
             if tests:
                 
@@ -631,7 +631,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline
-                    msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+                    msg += f"📘 Test: _{title}_ ([ko‘rish]({link}))\n🕒 Tugash: {short_deadline} {left} qoldi\n📖 Fan: {subject}\n\n"
 
 
             if assignments:
@@ -642,7 +642,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline                  
-                    msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+                    msg += f"📕 Topshiriq: _{title}_ ([ko‘rish]({link}))\n🕒 Tugash: {short_deadline} {left} qoldi\n📖 Fan: {subject}\n\n"
             
             # 🕓 Eng yaqin deadline
             all_items = tests + assignments
