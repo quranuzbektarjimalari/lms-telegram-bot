@@ -650,7 +650,7 @@ async def send_results(update: Update, fullname, tests, assignments):
             if closest_deadline:
                 remaining = format_timedelta(closest_diff)
                 msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
-            await update.message.reply_markdown(msg)
+            await update.message.reply_markdown(msg, disable_web_page_preview=True)
 
 # === 6. Botni ishga tushirish ===
 async def main():
