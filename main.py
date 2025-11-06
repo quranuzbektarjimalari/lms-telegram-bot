@@ -413,7 +413,7 @@ def days_left_text(deadline_str):
         if days < 0:
             return ""
         elif days == 0:
-            return "(bugun)"
+            return "(bugun tugaydi)"
         elif days == 1:
             return "(1 kun qoldi)"
         else:
@@ -642,7 +642,7 @@ async def send_results(update: Update, fullname, tests, assignments):
             if closest_deadline:
                 remaining = format_timedelta(closest_diff)
                 msg += f"```lms.iiau.uz ⏳ Sizdagi eng yaqin deadline tugashiga {remaining} qoldi! ``` \n\n"            
-            await update.message.reply_markdown(msg)
+            await update.message.reply_markdown(msg, disable_web_page_preview=True)
 
 # === 6. Botni ishga tushirish ===
 async def main():
