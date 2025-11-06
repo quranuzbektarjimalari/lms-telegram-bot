@@ -599,11 +599,11 @@ async def send_results(update: Update, fullname, tests, assignments):
 
         if not tests and not assignments:
             await update.message.reply_text(
-                f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n✅ *BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
+                f"👤 Hurmatli {fullname}! \n\n✅ *SIZDA BARCHA TEST VA TOPSHIRIQLAR BAJARILGAN!*",
                 parse_mode="Markdown",
             )
         else:
-            msg = f"👤 {fullname}, sizda quyidagilar aniqlandi:\n\n"
+            msg = f"👤 Hurmatli {fullname}! \n\n"
             test_count = len(tests)
             assign_count = len(assignments)
             count_parts = []
