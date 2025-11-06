@@ -421,7 +421,7 @@ def days_left_text(deadline_str):
         if days < 0:
             return ""
         elif days == 0:
-            return "(bugun)"
+            return "_(bugun tugaydi)_"
         elif days == 1:
             return "_(1 kun qoldi)_"
         else:
