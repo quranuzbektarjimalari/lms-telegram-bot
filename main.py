@@ -404,28 +404,20 @@ def format_timedelta(td: timedelta):
 
 def days_left_text(deadline_str):
     try:
-        # Masalan: "28-10-2025 23:00:00"
         dt = datetime.strptime(deadline_str.strip(), "%d-%m-%Y %H:%M:%S")
-
-        # Tashkent vaqt zonasiga moslashtirish (agar hali qo‘shilmagan bo‘lsa)
         if dt.tzinfo is None:
             dt = TASHKENT_TZ.localize(dt)
-
-        # Hozirgi vaqt (Tashkent)
         now = datetime.now(TASHKENT_TZ)
-
-        # Faqat kalendar kunlarni solishtiramiz
         days = (dt.date() - now.date()).days
 
-        # Natija
         if days < 0:
             return ""
         elif days == 0:
             return "(bugun)"
         elif days == 1:
-            return "(1 kun)"
+            return "(1 kun qoldi)"
         else:
-            return f"({days} kun)"
+            return f"({days} kun qoldi)"
     except Exception:
         return ""
 
@@ -631,7 +623,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline
-                    msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+                    msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n⏱️ Tugash: {short_deadline} _{left}_\n📓 Fan: {subject}\n\n"
 
 
             if assignments:
@@ -642,7 +634,7 @@ async def send_results(update: Update, fullname, tests, assignments):
                       short_deadline = datetime.strptime(deadline, "%d-%m-%Y %H:%M:%S").strftime("%d-%m-%Y %H:%M")
                     except Exception:
                       short_deadline = deadline                  
-                    msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {left} {short_deadline}\n👉 {subject}\n\n"
+                    msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n⏱️ Tugash: {short_deadline} _{left}_\n📓 Fan: {subject}\n\n"
             
             # 🕓 Eng yaqin deadline
             all_items = tests + assignments
