@@ -14,105 +14,35 @@ import pytz
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-
-
 # Encryption
 from cryptography.fernet import Fernet
+import mysql.connector
 
-# Bitta umumiy pool – barcha foydalanuvchilar uchun
-GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=30)
+# ========== Configuration & safety checks ==========
+# Ensure required environment variables exist (fail fast)
+required_env = ["BOT_TOKEN", "MYSQL_HOST", "MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DATABASE", "FERNET_KEY"]
+missing = [e for e in required_env if not os.getenv(e)]
+if missing:
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", "314980609"))  # default provided; override via env if needed
 
 nest_asyncio.apply()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# BOT_TOKEN should be set in environment for safety. Fallback to previous token only if env missing.
-BOT_TOKEN = os.environ.get("BOT_TOKEN") or "8283988514:AAFRMPgyjdkYsMXZaT75lZt0-FCWdaVjoLY"
-# Admin uchun chat ID
-ADMIN_CHAT_ID = 314980609  # bu yerga o'z Telegram ID'ingni yoz
-# Files for storing encrypted credentials
-CRED_FILE = "credentials.json"
-KEY_FILE = "secret.key"
+# ========== Globals ==========
+GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=30)
 
-
-
-# In-memory user data (session state)
-user_data = {}
-
-# Tashkent timezone
 TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 
-
-
-# UI buttons (Reply keyboard)
 keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("🔐 Tizimdan chiqish")]],
     resize_keyboard=True,
 )
 
-
-# ------------------ Encryption helpers ------------------
-
-def ensure_key():
-    """Ensure a Fernet key exists on disk and return Fernet instance."""
-    if not os.path.exists(KEY_FILE):
-        key = Fernet.generate_key()
-        with open(KEY_FILE, "wb") as f:
-            f.write(key)
-    else:
-        with open(KEY_FILE, "rb") as f:
-            key = f.read()
-    return Fernet(key)
-
-
-def load_all_credentials():
-    """Load and decrypt all credentials from disk. Returns dict chat_id -> {login, password}.
-    If file missing, returns {}.
-    """
-    if not os.path.exists(CRED_FILE):
-        return {}
-    try:
-        with open(CRED_FILE, "rb") as f:
-            encrypted = f.read()
-        if not encrypted:
-            return {}
-        fernet = ensure_key()
-        data_json = fernet.decrypt(encrypted).decode("utf-8")
-        return json.loads(data_json)
-    except Exception:
-        # If decryption fails, don't crash — return empty and warn later
-        return {}
-
-
-def save_all_credentials(all_creds: dict):
-    """Encrypt and write all credentials to disk."""
-    try:
-        fernet = ensure_key()
-        j = json.dumps(all_creds)
-        token = fernet.encrypt(j.encode("utf-8"))
-        with open(CRED_FILE, "wb") as f:
-            f.write(token)
-        return True
-    except Exception:
-        return False
-
-
-def get_credentials_for(chat_id):
-    allc = load_all_credentials()
-    return allc.get(str(chat_id))
-
-
-def set_credentials_for(chat_id, login, password):
-    allc = load_all_credentials()
-    allc[str(chat_id)] = {"login": login, "password": password}
-    return save_all_credentials(allc)
-
-
-def delete_credentials_for(chat_id):
-    allc = load_all_credentials()
-    if str(chat_id) in allc:
-        allc.pop(str(chat_id))
-        return save_all_credentials(allc)
-    return True
-
+# HTTP session (with retries)
 GLOBAL_SESSION = requests.Session()
 adapter = HTTPAdapter(max_retries=Retry(
     total=3,
@@ -121,6 +51,116 @@ adapter = HTTPAdapter(max_retries=Retry(
 ))
 GLOBAL_SESSION.mount("http://", adapter)
 GLOBAL_SESSION.mount("https://", adapter)
+
+# In-memory session state
+user_data = {}
+
+# ------------------ Encryption helpers ------------------
+
+def ensure_key() -> Fernet:
+    key = os.environ["FERNET_KEY"]
+    # Ensure it's bytes
+    if isinstance(key, str):
+        key = key.encode()
+    return Fernet(key)
+
+
+def get_db():
+    return mysql.connector.connect(
+        host=os.getenv("MYSQL_HOST"),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        database=os.getenv("MYSQL_DATABASE"),
+        port=int(os.getenv("MYSQL_PORT", 3306)),
+        autocommit=False
+    )
+
+
+# Create credentials table if not exists (run once at startup)
+def ensure_tables():
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS credentials (
+        chat_id BIGINT PRIMARY KEY,
+        login TEXT NOT NULL,
+        password TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+    """)
+    db.commit()
+    cursor.close()
+    db.close()
+
+
+# Return decrypted credentials for single chat_id (or None)
+def get_credentials_for(chat_id):
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT login, password FROM credentials WHERE chat_id = %s", (chat_id,))
+    row = cursor.fetchone()
+    cursor.close()
+    db.close()
+
+    if not row:
+        return None
+
+    f = ensure_key()
+    try:
+        login = f.decrypt(row["login"].encode()).decode()
+        password = f.decrypt(row["password"].encode()).decode()
+    except Exception as e:
+        logger.exception("Failed to decrypt credentials for %s: %s", chat_id, e)
+        return None
+
+    return {"login": login, "password": password}
+
+
+# Save (insert/update) encrypted credentials
+def set_credentials_for(chat_id, login, password):
+    db = get_db()
+    cursor = db.cursor()
+    f = ensure_key()
+    enc_login = f.encrypt(login.encode()).decode()
+    enc_password = f.encrypt(password.encode()).decode()
+
+    cursor.execute(
+        """
+        INSERT INTO credentials (chat_id, login, password)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            login = VALUES(login),
+            password = VALUES(password),
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (chat_id, enc_login, enc_password)
+    )
+    db.commit()
+    cursor.close()
+    db.close()
+    return True
+
+
+# Delete credentials
+def delete_credentials_for(chat_id):
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM credentials WHERE chat_id = %s", (chat_id,))
+    db.commit()
+    cursor.close()
+    db.close()
+    return True
+
+
+# Return dict of all chat_ids -> True (used by broadcast)
+def load_all_credentials():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT chat_id FROM credentials")
+    rows = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return {str(r["chat_id"]): True for r in rows} if rows else {}
 
 # === 1. LMS tizimiga kirish (brauzerdek ishlaydigan sessiya) ===
 def login_to_lms(username, password):
@@ -529,57 +569,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != ADMIN_CHAT_ID:
         return
-    if not os.path.exists(CRED_FILE):
-        await update.message.reply_text("⚠️ credentials.json fayli topilmadi.")
-        return
-
-    with open(CRED_FILE, "rb") as f:
-        encrypted = f.read()
-    if not encrypted:
-        await update.message.reply_text("👥 Hozircha hech kim tizimga kirmagan.")
-        return
-
-    fernet = ensure_key()
-    try:
-        data_json = fernet.decrypt(encrypted).decode("utf-8")
-        creds = json.loads(data_json)
-        count = len(creds)
-        await update.message.reply_text(f"👥 Hozirgi foydalanuvchilar soni: {count}")
-    except Exception:
-        await update.message.reply_text("❌ Foydalanuvchilar ma’lumotini o‘qib bo‘lmadi.")           
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT COUNT(*) FROM credentials")
+    count = cursor.fetchone()[0] or 0
+    cursor.close()
+    db.close()
+    await update.message.reply_text(f"👥 Hozirgi foydalanuvchilar soni: {count}")         
 
 # === Admin xabari: barcha foydalanuvchilarga xabar yuborish ===
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != ADMIN_CHAT_ID:
-        return  # faqat admin foydalana oladi
-
+        return
     creds = load_all_credentials()
     if not creds:
-        await update.message.reply_text("⚠️ Hozircha tizimda hech qanday foydalanuvchi yo‘q.")
+        await update.message.reply_text("⚠️ Hozircha tizimda foydalanuvchi yo‘q.")
         return
-
-    # Admin xabar matnini olamiz
     if len(context.args) == 0:
         await update.message.reply_text("✏️ Foydalanish: /broadcast Siz yubormoqchi bo‘lgan xabar matni")
         return
-
     message_text = " ".join(context.args)
-
     success = 0
     fail = 0
     for chat_id in creds.keys():
         try:
             await context.bot.send_message(chat_id=int(chat_id), text=message_text)
             success += 1
-            await asyncio.sleep(0.1)  # flood-limitdan qochish
+            await asyncio.sleep(0.1)
         except Exception:
             fail += 1
             continue
-
     await update.message.reply_text(
         f"📢 Xabar yuborildi!\n✅ Muvaffaqiyatli: {success}\n❌ Xatolik: {fail}"
     )
-
 
 # === Vazifalar tekshiruv natijasini ===
 async def send_results(update: Update, fullname, tests, assignments):
