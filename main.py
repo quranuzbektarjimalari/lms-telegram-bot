@@ -20,7 +20,7 @@ print(Fernet.generate_key().decode())
 import mysql.connector
 
 # ========== Configuration & safety checks ==========
-# Ensure required environment variables exist (fail fast)
+
 required_env = ["BOT_TOKEN", "MYSQL_HOST", "MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DATABASE", "FERNET_KEY"]
 missing = [e for e in required_env if not os.getenv(e)]
 if missing:
