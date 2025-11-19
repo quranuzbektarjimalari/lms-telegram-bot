@@ -170,6 +170,18 @@ def login_to_lms(username, password):
 
 # === 📘 Fanlar ro‘yxati (id → nom) ===
 SUBJECT_LINKS = {
+    "814-27-uz": "Internetda medialoyihalar",
+    "815-27-uz": "Virtual reallik",
+    "816-27-uz": "Ovoz va tasvirlarni qayta ishlash",
+    "817-27-uz": "Mobil ilovalar yaratish va ularning xavfsizligini ta’minlash",
+    "818-27-uz": "Kibermakonda axborot xavfsizligi",
+    "819-27-uz": "Sun’iy intellekt asoslari",
+    "820-27-uz": "Islom kapitali va moliya bozori",
+    "821-27-uz": "Moliyaviy menejment",
+    "822-27-uz": "Islomda savdo va tadbirkorlik",
+    "823-27-uz": "Zamonaviy iqtisodiy kompyuter dasturlari",
+    "824-27-uz": "Moliyaviy hisob 2",
+    "825-27-uz": "Xalqaro valyuta-kredit munosabatlari",
     "826-27-uz": "Kalom ilmi tarixi va nazariyasi II",
     "827-27-uz": "Islom manbashunosligi",
     "828-27-uz": "Moturidiya ta’limotiga oid manbalar",
