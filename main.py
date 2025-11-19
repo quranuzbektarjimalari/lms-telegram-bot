@@ -525,16 +525,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# === Admin buyrug‘i: foydalanuvchilar sonini ko‘rish ===
+# === Admin buyrug‘i: foydalanuvchilar soni va loginlarini ko‘rish ===
 async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != ADMIN_CHAT_ID:
         return
+
     if not os.path.exists(CRED_FILE):
         await update.message.reply_text("⚠️ credentials.json fayli topilmadi.")
         return
 
     with open(CRED_FILE, "rb") as f:
         encrypted = f.read()
+
     if not encrypted:
         await update.message.reply_text("👥 Hozircha hech kim tizimga kirmagan.")
         return
@@ -544,9 +546,23 @@ async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data_json = fernet.decrypt(encrypted).decode("utf-8")
         creds = json.loads(data_json)
         count = len(creds)
-        await update.message.reply_text(f"👥 Hozirgi foydalanuvchilar soni: {count}")
+
+        if count == 0:
+            await update.message.reply_text("👥 Hozircha hech kim tizimga kirmagan.")
+            return
+
+        # Loginlarni chiqarish
+        logins_list = [v["login"] for k, v in creds.items()]
+        logins_text = "\n".join([f"{i+1}. {login}" for i, login in enumerate(logins_list)])
+
+        await update.message.reply_text(
+            f"👥 Hozirgi foydalanuvchilar soni: {count}\n\n"
+            f"📄 Foydalanuvchilar loginlari:\n{logins_text}"
+        )
+
     except Exception:
-        await update.message.reply_text("❌ Foydalanuvchilar ma’lumotini o‘qib bo‘lmadi.")           
+        await update.message.reply_text("❌ Foydalanuvchilar ma’lumotini o‘qib bo‘lmadi.")
+        
 
 # === Admin xabari: barcha foydalanuvchilarga xabar yuborish ===
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
