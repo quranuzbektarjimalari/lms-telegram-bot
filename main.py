@@ -16,6 +16,7 @@ from urllib3.util.retry import Retry
 
 # Encryption
 from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
 import mysql.connector
 
 # ========== Configuration & safety checks ==========
@@ -57,13 +58,11 @@ user_data = {}
 
 # ------------------ Encryption helpers ------------------
 
-def ensure_key() -> Fernet:
-    key = os.environ["FERNET_KEY"]
-    # Ensure it's bytes
-    if isinstance(key, str):
-        key = key.encode()
-    return Fernet(key)
-
+def ensure_key():
+    key = os.getenv("FERNET_KEY")
+    if not key:
+        raise ValueError("FERNET_KEY environment variable topilmadi!")
+    return Fernet(key.encode())
 
 def get_db():
     return mysql.connector.connect(
