@@ -577,6 +577,7 @@ async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
 
 # === Admin xabari: barcha foydalanuvchilarga xabar yuborish ===
+# Admin xabari: barcha foydalanuvchilarga xabar yuborish (qatorlarni saqlab)
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != ADMIN_CHAT_ID:
         return  # faqat admin foydalana oladi
@@ -586,18 +587,27 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Hozircha tizimda hech qanday foydalanuvchi yo‘q.")
         return
 
-    # Admin xabar matnini olamiz
+    # Agar admin matn yozmagan bo'lsa
     if len(context.args) == 0:
-        await update.message.reply_text("✏️ Foydalanish: /broadcast Siz yubormoqchi bo‘lgan xabar matni")
+        await update.message.reply_text(
+            "✏️ Foydalanish: /broadcast Siz yubormoqchi bo‘lgan xabar matni"
+        )
         return
 
-    message_text = " ".join(context.args)
+    # Admin yozgan matnni o'z holida olish (qatorlar saqlansin)
+    # "update.message.text" - butun matn, /broadcast dan keyingi qismi:
+    message_text = update.message.text.partition(' ')[2]
 
     success = 0
     fail = 0
     for chat_id in creds.keys():
         try:
-            await context.bot.send_message(chat_id=int(chat_id), text=message_text)
+            await context.bot.send_message(
+                chat_id=int(chat_id),
+                text=message_text,  # qatorlar bilan jo'natiladi
+                parse_mode="Markdown",  # bold, italic, link ishlatish mumkin
+                disable_web_page_preview=True
+            )
             success += 1
             await asyncio.sleep(0.1)  # flood-limitdan qochish
         except Exception:
@@ -607,7 +617,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📢 Xabar yuborildi!\n✅ Muvaffaqiyatli: {success}\n❌ Xatolik: {fail}"
     )
-
 
 # === Vazifalar tekshiruv natijasini ===
 async def send_results(update: Update, fullname, tests, assignments):
