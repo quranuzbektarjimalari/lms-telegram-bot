@@ -44,7 +44,7 @@ TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 
 # UI buttons (Reply keyboard)
 keyboard = ReplyKeyboardMarkup(
-    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("📊 Baholarim"), KeyboardButton("🔐 Tizimdan chiqish")]],
+    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("📊 Olingan baholar"), KeyboardButton("🔐 Tizimdan chiqish")]],
     resize_keyboard=True,
 )
 
@@ -523,7 +523,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     
     # 0) Baholarni ko‘rish
-    if text == "📊 Baholarim":
+    if text == "📊 Olingan baholar":
         await show_grades(update, context)
         return
 
@@ -758,7 +758,7 @@ async def main():
     app.add_handler(CommandHandler("users", users))  # 🆕 admin uchun buyruq
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("broadcast", broadcast))
-    app.add_handler(MessageHandler(filters.Regex("^📊 Baholarim$"), show_grades))
+    app.add_handler(MessageHandler(filters.Regex("^📊 Olingan baholar$"), show_grades))
 
 
     print("🤖 Bot ishga tushdi! Endi Telegramda /start deb yozing.")
