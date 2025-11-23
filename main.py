@@ -186,7 +186,7 @@ def parse_grades(html):
         max_score = score_btns[1].get_text(strip=True)
         results.append(
             f"📕 *Topshiriq*: *{task}*\n"
-            f"⏱️ Sana: {time}\n"
+            f"⏱️ Baho sanasi: {time}\n"
             f"📓 Fan: {subject}\n"
             f"⭐️ Olingan baho: {score} / {max_score}" 
         )
@@ -228,6 +228,7 @@ async def show_grades(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 4️⃣ Oxirgi 10 ta bahoni olish
     last_10 = all_grades[-10:]
+    last_10.reverse()
     message_text = "\n\n".join(last_10)
     await loading_message.edit_text(f"📊 *Oxirgi topshiriqlar baholari*:\n\n{message_text}", parse_mode="Markdown")
 
