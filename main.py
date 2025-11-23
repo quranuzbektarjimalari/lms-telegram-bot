@@ -521,6 +521,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
+    
+    # 0) Baholarni ko‘rish
+    if text == "📊 Baholarim":
+        await show_grades(update, context)
+        return
 
     # 1) Vazifalarni tekshirish
     if text == "✅ Vazifalarni tekshirish":
