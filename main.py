@@ -14,8 +14,6 @@ import pytz
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-
-
 # Encryption
 from cryptography.fernet import Fernet
 
