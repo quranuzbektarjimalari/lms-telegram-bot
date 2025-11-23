@@ -230,7 +230,7 @@ async def show_grades(update: Update, context: ContextTypes.DEFAULT_TYPE):
     last_10 = all_grades[-10:]
     last_10.reverse()
     message_text = "\n\n".join(last_10)
-    await loading_message.edit_text(f"📊 *Oxirgi topshiriqlar baholari*:\n\n{message_text}", parse_mode="Markdown")
+    await update.message.reply_text(f"📊 *Oxirgi topshiriqlar baholari*:\n\n{message_text}", parse_mode="Markdown")
 
 # === 📘 Fanlar ro‘yxati (id → nom) ===
 SUBJECT_LINKS = {
