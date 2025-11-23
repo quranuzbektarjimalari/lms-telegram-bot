@@ -44,7 +44,7 @@ TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 
 # UI buttons (Reply keyboard)
 keyboard = ReplyKeyboardMarkup(
-    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("🔐 Tizimdan chiqish")]],
+    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("📊 Baholarim"), KeyboardButton("🔐 Tizimdan chiqish")]],
     resize_keyboard=True,
 )
 
@@ -167,6 +167,71 @@ def login_to_lms(username, password):
             return None, None, "❌ Login yoki parol noto‘g‘ri bo‘lishi mumkin."
     except Exception as e:
         return None, None, f"❌ LMS ga ulanishda xato: {e}"
+
+def parse_grades(html):
+    soup = BeautifulSoup(html, "html.parser")
+    rows = soup.select("table tbody tr")
+
+    results = []
+    for row in rows:
+        cols = row.find_all("td")
+        if len(cols) < 5:
+            continue
+
+        time = cols[0].get_text(strip=True)
+        subject = cols[1].get_text(strip=True)
+        task = cols[2].get_text(strip=True)
+        teacher = cols[3].get_text(strip=True)
+
+        score_btns = cols[4].select("button")
+        score = score_btns[0].get_text(strip=True)
+        max_score = score_btns[1].get_text(strip=True)
+        results.append(
+            f"📕 *Topshiriq*: *{task}*\n"
+            f"⏱️ Sana: {time}\n"
+            f"📓 Fan: {subject}\n"
+            f"⭐️ Olingan baho: {score} / {max_score}" 
+        )
+  
+    return results
+
+async def show_grades(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+
+    # 1️⃣ Foydalanuvchi login/parolni olish
+    creds = get_credentials_for(user.id)
+    if not creds:
+        await update.message.reply_text("❌ Avval LMS tizimiga kiring.")
+        return
+    # 1️⃣ Darhol foydalanuvchiga javob yuboramiz
+    loading_message = await update.message.reply_text("⏳ Baholar olinmoqda, iltimos kuting...")
+
+    # 2️⃣ LMSga login
+    loop = asyncio.get_running_loop()
+    session, fullname, error = await loop.run_in_executor(GLOBAL_EXECUTOR, login_to_lms, creds["login"], creds["password"])
+    if not session:
+        await update.message.reply_text("❌ LMSga ulanib bo‘lmadi. Parol yoki login noto‘g‘ri.")
+        return
+
+    # 3️⃣ Barcha sahifalardagi baholarni yig‘ish
+    all_grades = []
+    page = 1
+    while True:
+        r = session.get(f"https://lms.iiau.uz/dashboard/grades?page={page}")
+        grades = parse_grades(r.text)
+        if not grades:
+            break
+        all_grades.extend(grades)
+        page += 1
+
+    if not all_grades:
+        await update.message.reply_text("❗ Hozircha baholar topilmadi.")
+        return
+
+        # 4️⃣ Oxirgi 10 ta bahoni olish
+    last_10 = all_grades[-10:]
+    message_text = "\n\n".join(last_10)
+    await loading_message.edit_text(f"📊 *Oxirgi topshiriqlar baholari*:\n\n{message_text}", parse_mode="Markdown")
 
 # === 📘 Fanlar ro‘yxati (id → nom) ===
 SUBJECT_LINKS = {
@@ -688,6 +753,7 @@ async def main():
     app.add_handler(CommandHandler("users", users))  # 🆕 admin uchun buyruq
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(MessageHandler(filters.Regex("^📊 Baholarim$"), show_grades))
 
 
     print("🤖 Bot ishga tushdi! Endi Telegramda /start deb yozing.")
