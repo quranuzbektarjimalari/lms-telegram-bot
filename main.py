@@ -199,7 +199,7 @@ async def show_grades(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 1️⃣ Foydalanuvchi login/parolni olish
     creds = get_credentials_for(user.id)
     if not creds:
-        await update.message.reply_text("❌ Avval LMS tizimiga kiring.")
+        await update.message.reply_text("Siz tizimga kirmagansiz. Iltimos, /start qilib login va parol orqali tizimga kiring.")
         return
     # 1️⃣ Darhol foydalanuvchiga javob yuboramiz
     loading_message = await update.message.reply_text("⏳ Baholar olinmoqda, iltimos kuting...")
