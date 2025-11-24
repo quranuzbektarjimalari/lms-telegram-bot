@@ -240,7 +240,7 @@ async def send_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = (
         "ℹ️ *Botdan foydalanish bo‘yicha qisqa qo‘llanma*\n\n"
         "🎯 *Botning maqsadi nima?*\n"
-        "Talabaning hozirda faol (bajarilishi kerak bo‘lgan) vazifalarini topib beradi.\n\n"
+        "Talabaning hozirda faol (bajarilishi kerak bo‘lgan) vazifalarini topib beradi.\nTalabada qaysi vazifalar bajarilmay turganini ko‘rsatib beradi.\n\n"
         "⚙️ *Bot qanday ishlaydi?*\n\n"
         "📘 *Testlar uchun*\n"
         "Bot faqat \"Testni boshlash\" holatidagi testlarni aniqlab beradi. "
