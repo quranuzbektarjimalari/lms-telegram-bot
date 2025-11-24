@@ -232,6 +232,26 @@ async def show_grades(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = "\n\n".join(last_10)
     await update.message.reply_text(f"📊 *Oxirgi topshiriqlar baholari*:\n\n{message_text}", parse_mode="Markdown")
 
+async def send_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    about_text = (
+        "📘 *Botdan foydalanish bo‘yicha qisqa qo‘llanma*\n\n"
+        "🎯 *Botning maqsadi nima?*\n"
+        "Talabaning hozirda faol (bajarilishi kerak bo‘lgan) vazifalarini topib beradi.\n\n"
+        "⚙️ *Bot qanday ishlaydi?*\n\n"
+        "📝 *Testlar uchun*\n"
+        "Bot faqat \"Testni boshlash\" holatidagi testlarni aniqlab beradi. "
+        "Vaqti o'tib ketgan va endi ochiladigan testlarni aniqlamaydi.\n\n"
+        "📂 *Topshiriqlar uchun*\n"
+        "Bot faqat \"Jo‘natish\" qismi ochiq bo‘lgan topshiriqlarni ko‘rsatadi. "
+        "Vaqti o'tib ketgan va bajarib fayl joylangan topshiriqlarni ko‘rsatmaydi.\n\n"
+        "💡 *Foydalanish bo‘yicha tavsiya*\n"
+        "Ustozlar ko‘pincha har kuni yoki kun ora yangi topshiriq joylashadi.\n"
+        "Shuning uchun botni har kuni kechqurun tekshirib turing — "
+        "shu orqali yangi qo‘shilgan vazifani va uning deadline’ini o‘z vaqtida bilib olasiz."
+    )
+    # yuborish
+    await update.message.reply_text(about_text, parse_mode="Markdown")
+
 # === 📘 Fanlar ro‘yxati (id → nom) ===
 SUBJECT_LINKS = {
     "814-27-uz": "Internetda medialoyihalar",
@@ -520,29 +540,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
-
-        # ℹ️ Bot haqida
-    if text == "ℹ️ Bot haqida":
-    about_text = (
-        "📘 *Botdan foydalanish bo‘yicha qisqa qo‘llanma*\n\n"
-        "🎯 *Botning maqsadi nima?*\n"
-        "Talabaning hozirda faol (bajarilishi kerak bo‘lgan) vazifalarini topib beradi.\n\n"
-        "⚙️ *Bot qanday ishlaydi?*\n\n"
-        "📝 *Testlar uchun*\n"
-        "Bot faqat \"Testni boshlash\" holatidagi testlarni aniqlab beradi. "
-        "Vaqti o'tib ketgan hamda endi ochiladigan testlarni aniqlamaydi.\n\n"
-        "📂 *Topshiriqlar uchun*\n"
-        "Bot faqat \"Jo‘natish\" qismi ochiq bo‘lgan topshiriqlarni ko‘rsatadi. "
-        "Vaqti o'tib ketgan hamda bajarib fayl joylangan topshiriqlarni ko‘rsatmaydi.\n\n"
-        "💡 *Foydalanish bo‘yicha tavsiya*\n"
-        "Ustozlar ko‘pincha har kuni yoki kun ora yangi topshiriq joylashadi.\n"
-        "Shuning uchun botni har kuni kechqurun tekshirib turing — "
-        "shu orqali yangi qo‘shilgan vazifani va uning deadline’ini o‘z vaqtida bilib olasiz."
-    )
-
-    await update.message.reply_text(about_text, parse_mode="Markdown")
-    return
-
         
     # 0) Baholarni ko‘rish
     if text == "📊 Olingan baholar":
