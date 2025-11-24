@@ -40,11 +40,15 @@ TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 
 
 
-# UI buttons (Reply keyboard)
 keyboard = ReplyKeyboardMarkup(
-    [[KeyboardButton("✅ Vazifalarni tekshirish"), KeyboardButton("📊 Olingan baholar"), KeyboardButton("🔐 Tizimdan chiqish"), KeyboardButton("ℹ️ Bot haqida")]],
-    resize_keyboard=True,
+    [
+        [KeyboardButton("✅ Vazifalarni tekshirish")],
+        [KeyboardButton("📊 Olingan baholar")],
+        [KeyboardButton("ℹ️ Bot haqida"), KeyboardButton("🔐 Tizimdan chiqish")]
+    ],
+    resize_keyboard=True
 )
+
 
 
 # ------------------ Encryption helpers ------------------
