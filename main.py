@@ -540,12 +540,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
-        
+
+    # ℹ️ Bot haqida
+    if text == "ℹ️ Bot haqida":
+        await send_about(update, context)
+        return
+    
     # 0) Baholarni ko‘rish
     if text == "📊 Olingan baholar":
         await show_grades(update, context)
         return
-
+        
     # 1) Vazifalarni tekshirish
     if text == "✅ Vazifalarni tekshirish":
         creds = get_credentials_for(chat_id)
