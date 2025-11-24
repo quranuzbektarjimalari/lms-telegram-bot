@@ -234,7 +234,7 @@ async def show_grades(update: Update, context: ContextTypes.DEFAULT_TYPE):
     last_10 = all_grades[-10:]
     last_10.reverse()
     message_text = "\n\n".join(last_10)
-    await update.message.reply_text(f"📊 *Oxirgi topshiriqlar baholari*:\n\n{message_text}", parse_mode="Markdown")
+    await update.message.reply_text(f"📊 *Oxirgi 10 ta topshiriqning baholari*:\n\n{message_text}", parse_mode="Markdown")
 
 async def send_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = (
