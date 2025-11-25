@@ -6,7 +6,7 @@ import time
 import logging
 import requests
 from bs4 import BeautifulSoup
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -38,6 +38,7 @@ user_data = {}
 # Tashkent timezone
 TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 
+PAGE_SIZE = 3  # har sahifada ko'rsatiladigan topshiriqlar soni
 
 
 keyboard = ReplyKeyboardMarkup(
@@ -49,6 +50,39 @@ keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+
+async def send_grade_page(chat_id, update, context, page=None):
+    """Foydalanuvchiga hozirgi sahifadagi baholarni yuboradi va keyingi/oldingi pagination tugmalarini qo‘yadi"""
+    if page is None:
+        page = user_data[chat_id]["page"]
+
+    grades = user_data[chat_id]["grades"]
+    total_pages = (len(grades) - 1) // PAGE_SIZE + 1
+
+    start = page * PAGE_SIZE
+    end = start + PAGE_SIZE
+    page_grades = grades[start:end]
+
+    message_text = "\n\n".join(page_grades)
+
+    # Inline pagination tugmalari
+    buttons = []
+    if page > 0:
+        buttons.append(InlineKeyboardButton("⬅️ yangi", callback_data=f"grades_page_{page-1}"))
+    if page < total_pages - 1:
+        buttons.append(InlineKeyboardButton("eski ➡️", callback_data=f"grades_page_{page+1}"))
+
+    reply_markup = InlineKeyboardMarkup([buttons]) if buttons else None
+
+    # Agar xabar oldin yuborilgan bo‘lsa, edit qila olamiz
+    if update.callback_query:
+        await update.callback_query.edit_message_text(
+            message_text, parse_mode="Markdown", reply_markup=reply_markup
+        )
+    else:
+        await update.message.reply_text(
+            message_text, parse_mode="Markdown", reply_markup=reply_markup
+        )
 
 
 # ------------------ Encryption helpers ------------------
@@ -166,7 +200,7 @@ def login_to_lms(username, password):
                 pass
             return session, fullname, None
         else:
-            return None, None, "❌ Login yoki parol noto‘g‘ri bo‘lishi mumkin."
+            return None, None, "❌ Login yoki parol noto‘g‘ri bo‘lishi mumkin.\n Iltimos, qaytadan /start bosib login-parol tering!"
     except Exception as e:
         return None, None, f"❌ LMS ga ulanishda xato: {e}"
 
@@ -197,61 +231,82 @@ def parse_grades(html):
   
     return results
 
-async def show_grades(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.message.from_user
-
-    # 1️⃣ Foydalanuvchi login/parolni olish
-    creds = get_credentials_for(user.id)
+async def show_grades_paginated(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0):
+    chat_id = update.effective_chat.id
+    creds = get_credentials_for(chat_id)
     if not creds:
-        await update.message.reply_text("Siz tizimga kirmagansiz. Iltimos, /start qilib login va parol orqali tizimga kiring.")
+        await update.message.reply_text(
+            "❌ Siz tizimga kirmagansiz. Iltimos, /start qilib login va parol orqali tizimga kiring."
+        )
         return
-    # 1️⃣ Darhol foydalanuvchiga javob yuboramiz
-    loading_message = await update.message.reply_text("⏳ Baholar olinmoqda, iltimos kuting...")
 
-    # 2️⃣ LMSga login
+    loading_message = await update.message.reply_text("⏳ Baholar ko‘rilmoqda, iltimos kuting...")
+
     loop = asyncio.get_running_loop()
-    session, fullname, error = await loop.run_in_executor(GLOBAL_EXECUTOR, login_to_lms, creds["login"], creds["password"])
+    session, fullname, error = await loop.run_in_executor(
+        GLOBAL_EXECUTOR, login_to_lms, creds["login"], creds["password"]
+    )
     if not session:
-        await update.message.reply_text("❌ LMSga ulanib bo‘lmadi. Parol yoki login noto‘g‘ri.")
+        await loading_message.edit_text("❌ LMSga ulanib bo‘lmadi.")
         return
 
-    # 3️⃣ Barcha sahifalardagi baholarni yig‘ish
+    # barcha sahifalardan baholarni yig‘ish
     all_grades = []
-    page = 1
+    page_num = 1
     while True:
-        r = session.get(f"https://lms.iiau.uz/dashboard/grades?page={page}")
+        try:
+            r = session.get(f"https://lms.iiau.uz/dashboard/grades?page={page_num}", timeout=10)
+            r.raise_for_status()
+        except requests.exceptions.ConnectionError:
+            await loading_message.edit_text(
+                "❌ LMS serveriga ulanishda muammo yuz berdi. Keyinroq urinib ko‘ring."
+            )
+            return
+        except requests.exceptions.Timeout:
+            await loading_message.edit_text("❌ So‘rov vaqti tugadi. Keyinroq urinib ko‘ring.")
+            return
+        except requests.exceptions.HTTPError as e:
+            await loading_message.edit_text(f"❌ Server javobida xatolik yuz berdi. Keyinroq urinib ko‘ring.")
+            return
+        except Exception as e:
+            await loading_message.edit_text(f"❌ Noma'lum xatolik yuz berdi. Keyinroq urinib ko‘ring.")
+            return
+
         grades = parse_grades(r.text)
         if not grades:
             break
         all_grades.extend(grades)
-        page += 1
+        page_num += 1
 
     if not all_grades:
-        await update.message.reply_text("❗ Hozircha baholar topilmadi.")
+        await loading_message.edit_text("❗ Hozircha baholar topilmadi.")
         return
 
-        # 4️⃣ Oxirgi 10 ta bahoni olish
-    last_10 = all_grades[-10:]
-    last_10.reverse()
-    message_text = "\n\n".join(last_10)
-    await update.message.reply_text(f"📊 *Oxirgi 10 ta topshiriqning baholari*:\n\n{message_text}", parse_mode="Markdown")
+    all_grades.reverse()  # eng yangi tepada bo‘lsin
+
+    # user_data ga saqlaymiz
+    user_data[chat_id] = {"grades": all_grades, "page": page}
+
+    # birinchi sahifani yuboramiz
+    await send_grade_page(chat_id, update, context, page=page)
+
 
 async def send_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = (
-        "ℹ️ *Botdan foydalanish bo‘yicha qisqa qo‘llanma*\n\n"
+        "ℹ️ *Botdan foydalanish bo‘yicha qo‘llanma*\n\n"
         "🎯 *Botning maqsadi nima?*\n"
-        "Talabaning hozirda faol (bajarilishi kerak bo‘lgan) vazifalarini topib beradi.\nTalabada qaysi vazifalar bajarilmay turganini ko‘rsatib beradi.\n\n"
+        "Ushbu bot talabaning hozirgi faol vazifalarini aniqlaydi va qaysi topshiriqlar bajarilmay turganini ko‘rsatadi. Bundan tashqari topshiriqlarga qo‘yilgan baholarni ko‘rsatib turadi.\n\n"
         "⚙️ *Bot qanday ishlaydi?*\n\n"
         "📘 *Testlar uchun*\n"
         "Bot faqat \"Testni boshlash\" holatidagi testlarni aniqlab beradi. "
-        "Vaqti o'tib ketgan va endi ochiladigan testlarni aniqlamaydi.\n\n"
+        "Vaqti o‘tib ketgan yoki hali ochilmagan testlar ko‘rsatilmaydi.\n\n"
         "📕 *Topshiriqlar uchun*\n"
         "Bot faqat \"Jo‘natish\" qismi ochiq bo‘lgan topshiriqlarni ko‘rsatadi. "
-        "Vaqti o'tib ketgan va bajarib fayl joylangan topshiriqlarni ko‘rsatmaydi.\n\n"
-        "💡 *Foydalanish bo‘yicha tavsiya*\n"
-        "Ustozlar ko‘pincha har kuni yoki kun ora yangi topshiriq joylashadi.\n"
-        "Shuning uchun botni har kuni kechqurun tekshirib turing — "
-        "shu orqali yangi qo‘shilgan vazifani va uning deadline’ini o‘z vaqtida bilib olasiz."
+        "Vaqti o‘tib ketgan va allaqachon bajarilgan topshiriqlar ko‘rsatmaydi.\n\n"
+        "📊 *Baholar uchun*\n"
+        "Bot talabaning topshiriqlari bo‘yicha olgan eng so‘nggi baholarini ko‘rsatadi.\n\n"
+        "❗️ *ESLATMA*\n"
+        "Ustozlar ko‘pincha har kuni yoki kun ora yangi topshiriqlar joylab turishadi. Shuning uchun botni har kuni kechqurun tekshirib turing, shu orqali yangi qo‘shilgan vazifani va uning deadline’ini o‘z vaqtida bilib olasiz."
     )
     # yuborish
     await update.message.reply_text(about_text, parse_mode="Markdown")
@@ -299,9 +354,6 @@ def extract_subject_fast(soup):
         return "❓ Fani aniqlanmadi"
     except Exception:
         return "❓ Fani aniqlanmadi"
-
-
-
 
 
 # === ⚡ Tezkor HEAD tekshiruvi ===
@@ -525,20 +577,21 @@ def days_left_text(deadline_str):
 # === 5. Ishlov beruvchilar ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    # Show keyboard and check if credentials exist
     creds = get_credentials_for(chat_id)
+    
     if creds:
         await update.message.reply_text(
             "👋 Assalomu alaykum! Siz oldin tizimga kirgansiz. Quyidagi tugmalardan foydalaning:",
-            reply_markup=keyboard,
+            reply_markup=keyboard
         )
     else:
-        # ask for login/password as before
         user_data[chat_id] = {"stage": "login"}
         await update.message.reply_text(
-            "👋 Assalomu alaykum! Botga xush kelibsiz. Botdan foydalanish uchun login va parol kiritish kerak. \n\nIltimos, LMS dagi loginingizni kiriting:",
-            reply_markup=keyboard,
+            "👋 Assalomu alaykum! Botga xush kelibsiz. Botdan foydalanish uchun login va parol kiritish kerak.\n\n"
+            "Iltimos, LMS dagi loginingizni kiriting:",
+            reply_markup=keyboard
         )
+
 
 # === 6. Xabarlarni qayta ishlash ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -550,16 +603,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_about(update, context)
         return
     
-    # 0) Baholarni ko‘rish
+    # 📊 Baholarni ko‘rish (ReplyKeyboard)
     if text == "📊 Olingan baholar":
-        await show_grades(update, context)
+        await show_grades_paginated(update, context, page=0)
         return
-        
-    # 1) Vazifalarni tekshirish
+
+    # ✅ Vazifalarni tekshirish (ReplyKeyboard)
     if text == "✅ Vazifalarni tekshirish":
         creds = get_credentials_for(chat_id)
         if not creds:
-            await update.message.reply_text("Siz tizimga kirmagansiz. Iltimos, /start qilib login va parol orqali tizimga kiring.")
+            await update.message.reply_text(
+                "❌ Siz tizimga kirmagansiz. Iltimos, /start qilib login va parol orqali tizimga kiring."
+            )
             return
 
         await update.message.reply_text("⏳ Vazifalar tekshirilmoqda, 1 daqiqacha kuting...")
@@ -567,10 +622,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session, fullname, error = await loop.run_in_executor(GLOBAL_EXECUTOR, login_to_lms, creds["login"], creds["password"])
             
         if error:
-          await update.message.reply_text(error)
-          return
+            await update.message.reply_text(error)
+            return
         
-    
         tests_future = loop.run_in_executor(GLOBAL_EXECUTOR, find_unfinished_tests, session)
         assigns_future = loop.run_in_executor(GLOBAL_EXECUTOR, find_unfinished_assignments, session)
         tests, assignments = await asyncio.gather(tests_future, assigns_future)
@@ -579,20 +633,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_results(update, fullname, tests, assignments)
         return
 
-    # 2) Tizimga kirish/chiqish
+    # 🔐 Tizimdan chiqish (ReplyKeyboard)
     if text == "🔐 Tizimdan chiqish":
         ok = delete_credentials_for(chat_id)
         user_data.pop(chat_id, None)
         if ok:
             await update.message.reply_text(
-                "Siz tizimdan chiqdingiz. Iltimos, /start qilib qaytadan tizimga kiring.",
+                "❗️ Siz tizimdan chiqdingiz. Iltimos, /start qilib qaytadan tizimga kiring.",
                 reply_markup=keyboard,
             )
         else:
             await update.message.reply_text("Xato: login/parolni o‘chirib bo‘lmadi. Administratorga murojaat qiling.")
         return
 
-    # 3) Interactive login flow (stated-based)
+    # --- Interactive login flow (stated-based) ---
     if chat_id in user_data and user_data[chat_id].get("stage"):
         stage = user_data[chat_id]["stage"]
 
@@ -607,10 +661,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             password = text
             await update.message.reply_text("⏳ Tizimga kirish tekshirilmoqda...")
             loop = asyncio.get_running_loop()
-
-            # Bu yerda ham bloklovchi login_to_lms ni executor orqali chaqiramiz
             session, fullname, error = await loop.run_in_executor(GLOBAL_EXECUTOR, login_to_lms, login, password)
-
 
             if error:
                 await update.message.reply_text(error)
@@ -633,6 +684,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Iltimos, menyudagi tugmalardan birini tanlang yoki /start deb yozing.", reply_markup=keyboard
     )
+
+
+# === Callback handler faqat InlineKeyboard uchun ===
+async def handle_grades_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data
+    chat_id = update.effective_chat.id
+
+    if data.startswith("grades_page_"):
+        page = int(data.split("_")[-1])
+        user_data[chat_id]["page"] = page
+        await send_grade_page(chat_id, update, context, page=page)
 
 
 # === Admin buyrug‘i: foydalanuvchilar soni va loginlarini ko‘rish ===
@@ -786,7 +849,7 @@ async def main():
     app.add_handler(CommandHandler("users", users))  # 🆕 admin uchun buyruq
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("broadcast", broadcast))
-    app.add_handler(MessageHandler(filters.Regex("^📊 Olingan baholar$"), show_grades))
+    app.add_handler(CallbackQueryHandler(handle_grades_callback, pattern="^grades_page_"))
     app.add_handler(MessageHandler(filters.Regex("^ℹ️ Bot haqida$"), send_about))
 
 
