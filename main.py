@@ -52,9 +52,7 @@ keyboard = ReplyKeyboardMarkup(
 
 
 async def send_grade_page(chat_id, update, context, page=None):
-    """Foydalanuvchiga hozirgi sahifadagi baholarni yuboradi va 
-    qisqartirilgan pagination tugmalarini qo‘yadi."""
-
+    """Foydalanuvchiga hozirgi sahifadagi baholarni yuboradi va keyingi/oldingi pagination tugmalarini qo‘yadi"""
     if page is None:
         page = user_data[chat_id]["page"]
 
@@ -70,70 +68,25 @@ async def send_grade_page(chat_id, update, context, page=None):
         + "\n\n".join(page_grades)
     )
 
-    page_buttons = []
-
-    # Doim 1-raqam chiqadi
-    page_buttons.append(
-        InlineKeyboardButton("1", callback_data="grades_page_0")
-    )
-
-    # Agar sahifa > 3 bo‘lsa — "..."
-    if page > 2:
-        page_buttons.append(InlineKeyboardButton("...", callback_data="noop"))
-
-    # Joriy sahifa atrofidagi tugmalar (page-1, page, page+1)
-    for p in range(max(1, page - 1), min(total_pages - 1, page + 2)):
-        page_buttons.append(
-            InlineKeyboardButton(
-                f"[{p+1}]" if p == page else str(p+1),
-                callback_data=f"grades_page_{p}"
-            )
-        )
-
-    # Agar sahifa oxiridan 3 ta uzoq bo‘lsa — "..."
-    if page < total_pages - 3:
-        page_buttons.append(InlineKeyboardButton("...", callback_data="noop"))
-
-    # Oxirgi sahifa
-    if total_pages > 1:
-        page_buttons.append(
-            InlineKeyboardButton(str(total_pages), callback_data=f"grades_page_{total_pages-1}")
-        )
-
-    # ------------------------------
-    # ⬅️ ➡️ Yangi / Eski baholar
-    # ------------------------------
-    nav_buttons = []
+    # Inline pagination tugmalari
+    buttons = []
     if page > 0:
-        nav_buttons.append(
-            InlineKeyboardButton("⬅️ Yangi baholar", callback_data=f"grades_page_{page-1}")
-        )
+        buttons.append(InlineKeyboardButton("⬅️ Yangi baholar", callback_data=f"grades_page_{page-1}"))
     if page < total_pages - 1:
-        nav_buttons.append(
-            InlineKeyboardButton("Eski baholar ➡️", callback_data=f"grades_page_{page+1}")
-        )
+        buttons.append(InlineKeyboardButton("Eski baholar ➡️", callback_data=f"grades_page_{page+1}"))
 
-    reply_markup = InlineKeyboardMarkup([nav_buttons, page_buttons])
+    reply_markup = InlineKeyboardMarkup([buttons]) if buttons else None
 
-    # ------------------------------
-    # Xabarni qayta tahrirlash yoki yangisini yuborish
-    # ------------------------------
+    # Agar xabar oldin yuborilgan bo‘lsa, edit qila olamiz
     if update.callback_query:
         await update.callback_query.answer()
-        try:
-            await update.callback_query.edit_message_text(
-                message_text, parse_mode="Markdown", reply_markup=reply_markup
-            )
-        except telegram.error.BadRequest as e:
-            # faqat "Message is not modified" xatosini e'tiborsiz qiling
-            if "Message is not modified" not in str(e):
-                raise  # boshqa xatolar bo'lsa, ularni ko'rsat
-
+        await update.callback_query.edit_message_text(
+            message_text, parse_mode="Markdown", reply_markup=reply_markup
+        )
     else:
         await update.message.reply_text(
             message_text, parse_mode="Markdown", reply_markup=reply_markup
         )
-
 
 # ------------------ Encryption helpers ------------------
 
@@ -349,12 +302,12 @@ async def send_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚙️ *Bot qanday ishlaydi?*\n\n"
         "📘 *Testlar uchun*\n"
         "Bot faqat \"Testni boshlash\" holatidagi testlarni aniqlab beradi. "
-        "Vaqti o‘tib ketgan yoki hali ochilmagan testlarni ko‘rsatmaydi.\n\n"
+        "Vaqti o‘tib ketgan yoki hali ochilmagan testlar ko‘rsatmaydi.\n\n"
         "📕 *Topshiriqlar uchun*\n"
         "Bot faqat \"Jo‘natish\" qismi ochiq bo‘lgan topshiriqlarni ko‘rsatadi. "
-        "Vaqti o‘tib ketgan va allaqachon bajarilgan topshiriqlarni ko‘rsatmaydi.\n\n"
+        "Vaqti o‘tib ketgan va allaqachon bajarilgan topshiriqlar ko‘rsatmaydi.\n\n"
         "📊 *Baholar uchun*\n"
-        "Bot talabaning topshiriqlari bo‘yicha olgan barcha baholarini ko‘rsatib turadi.\n\n"
+        "Bot talabaning topshiriqlari bo‘yicha olgan eng so‘nggi baholarini ko‘rsatadi.\n\n"
         "❗️ *ESLATMA*\n"
         "Ustozlar ko‘pincha har kuni yoki kun ora yangi topshiriqlar joylab turishadi. Shuning uchun botni har kuni kechqurun tekshirib turing, shu orqali yangi qo‘shilgan vazifani va uning deadline’ini o‘z vaqtida bilib olasiz."
     )
