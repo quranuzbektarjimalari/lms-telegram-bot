@@ -125,7 +125,7 @@ async def send_grade_page(chat_id, update, context, page=None):
                 message_text, parse_mode="Markdown", reply_markup=reply_markup
             )
         except telegram.error.BadRequest as e:
-        # faqat "Message is not modified" xatosini e'tiborsiz qiling
+            # faqat "Message is not modified" xatosini e'tiborsiz qiling
             if "Message is not modified" not in str(e):
                 raise  # boshqa xatolar bo'lsa, ularni ko'rsat
 
