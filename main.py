@@ -120,9 +120,15 @@ async def send_grade_page(chat_id, update, context, page=None):
     # ------------------------------
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(
-            message_text, parse_mode="Markdown", reply_markup=reply_markup
-        )
+        try:
+            await update.callback_query.edit_message_text(
+                message_text, parse_mode="Markdown", reply_markup=reply_markup
+            )
+        except telegram.error.BadRequest as e:
+        # faqat "Message is not modified" xatosini e'tiborsiz qiling
+            if "Message is not modified" not in str(e):
+                raise  # boshqa xatolar bo'lsa, ularni ko'rsat
+
     else:
         await update.message.reply_text(
             message_text, parse_mode="Markdown", reply_markup=reply_markup
