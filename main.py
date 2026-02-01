@@ -316,25 +316,22 @@ async def send_about(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === 📘 Fanlar ro‘yxati (id → nom) ===
 SUBJECT_LINKS = {
-    "814-27-uz": "Internetda medialoyihalar",
-    "815-27-uz": "Virtual reallik",
-    "816-27-uz": "Ovoz va tasvirlarni qayta ishlash",
-    "817-27-uz": "Mobil ilovalar yaratish va ularning xavfsizligini ta’minlash",
-    "818-27-uz": "Kibermakonda axborot xavfsizligi",
-    "819-27-uz": "Sun’iy intellekt asoslari",
-    "820-27-uz": "Islom kapitali va moliya bozori",
-    "821-27-uz": "Moliyaviy menejment",
-    "822-27-uz": "Islomda savdo va tadbirkorlik",
-    "823-27-uz": "Zamonaviy iqtisodiy kompyuter dasturlari",
-    "824-27-uz": "Moliyaviy hisob 2",
-    "825-27-uz": "Xalqaro valyuta-kredit munosabatlari",
-    "826-27-uz": "Kalom ilmi tarixi va nazariyasi II",
-    "827-27-uz": "Islom manbashunosligi",
-    "828-27-uz": "Moturidiya ta’limotiga oid manbalar",
-    "829-27-uz": "Tasavvuf II",
-    "830-27-uz": "Islom falsafasi",
-    "831-27-uz": "Arab tilining nazariy grammatikasi",
-    "832-27-uz": "Mantiq ilmi asoslari"
+    "833-28-uz": "Din sotsiologiyasi",
+    "834-28-uz": "Din psixologiyasi",
+    "835-28-uz": "Tafsir matnlari",
+    "836-28-uz": "Tasavvufiy tafsirlar",
+    "837-28-uz": "Hanafiylikdagi aqidaviy matnlar sharhlari",
+    "838-28-uz": "Qur'on navhi",
+    "839-28-uz": "Kompyuterv o'yinlarini yaratish",
+    "840-28-uz": "Web-dizayn",
+    "841-28-uz": "Intellektual tizimlar",
+    "842-28-uz": "Machine Learning",
+    "843-28-uz": "Simsiz tarmoqlarda axborot xavfsizligi",
+    "844-28-uz": "Inson resurslarini boshqarish",
+    "845-28-uz": "Vaqf menejmenti",
+    "846-28-uz": "Halol sertifikatlash tizimi",
+    "847-28-uz": "Islom mamlakatlari iqtisodiyoti",
+    "848-28-uz": "Xorijiy investitsiyalar"
 }
 
 def extract_subject_fast(soup):
@@ -414,7 +411,7 @@ def check_test(session, url):
     except Exception:
         return None
 
-def find_unfinished_tests(session, start_id=1004, end_id=1304):
+def find_unfinished_tests(session, start_id=1110, end_id=1410):
     base_url = "https://lms.iiau.uz/student/my-course/calendar/resource/test/"
     unfinished = []
     urls = [f"{base_url}{i}" for i in range(start_id, end_id + 1)]
@@ -487,7 +484,7 @@ def check_assignment(session, url, resend_variants):
         return None
 
 
-def find_unfinished_assignments(session, start_id=6343, end_id=6643):
+def find_unfinished_assignments(session, start_id=6500, end_id=6800):
     base_url = "https://lms.iiau.uz/student/my-course/calendar/resource/activity/standard-"
     resend_variants = ["Qayta jo'natish", "Qayta jo’natish", "Qayta joʻnatish", "Qayta jo`natish"]
     unfinished = []
@@ -813,7 +810,7 @@ async def send_results(update: Update, fullname, tests, assignments):
             if assign_count > 0:
               count_parts.append(f"{assign_count} ta topshiriq")
             count_text = " va ".join(count_parts)
-            msg += f"❗️ *Sizda {count_text} bajarilmagan👇 *\n\n"
+            msg += f"❗️ *Sizda bajarilmagan {count_text} mavjud 👇 *\n\n"
 
             if tests:
                 
